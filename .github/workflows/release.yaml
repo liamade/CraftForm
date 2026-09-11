@@ -107,7 +107,7 @@ jobs:
           # -j drops the path so it lands next to main.tf instead of in a subdir.
           # NOTE: codebuild only auto-finds "buildspec.yml", so since ours is .yaml to match the
           # rest of the repo, the project has to name it explicitly -> BuildSpec: buildspec.yaml
-          zip -j terraform.zip buildspec.yaml
+          zip -j terraform.zip codebuild/region/buildspec.yaml
 
           # SANITY CHECK -- if the buildspec didn't make it in, every region deploy is dead, so
           # break the release here instead of letting a user find out weeks later :(

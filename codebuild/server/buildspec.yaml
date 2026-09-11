@@ -1,0 +1,58 @@
+#╔══════════════════════════════════════════════════════════════════════════════╗
+#║                               CraftForm                                      ║
+#╠══════════════════════════════════════════════════════════════════════════════╣
+#║  CODEBUILD  ::  buildspec.yaml                                               ║
+#║  Bakes a minecraft server AMI, then reports to Discord.                      ║
+#║  Terraform never runs here -- servers live outside terraform state, so this  ║
+#║  is boto3 all the way down.                                                  ║
+#║                                                                              ║
+#║  Rides at the ROOT of server.zip so the buildspec and the python it runs     ║
+#║  always ship as one version. Codebuild only auto-finds "buildspec.yml", so   ║
+#║  the project names this one explicitly -> BuildSpec: buildspec.yaml          ║
+#╚══════════════════════════════════════════════════════════════════════════════╝
+
+version: 0.2   # the buildspec format version, not ours
+
+#============================================================
+#                 VARIABLE SETTINGS
+#============================================================
+# BAKED IN -- right here, same every run
+#   PYTHONUNBUFFERED  print() lands in cloudwatch in order, not at flush
+#
+# SET ON THE PROJECT -- cloudformation writes these once
+#   HOME_REGION       control-plane region (where ssm records live)
+#
+# INJECTED PER RUN -- the operations lambda passes these to start_build
+#   SERVER_NAME       the name, which is also the ssm key
+#   SERVER_TYPE       vanilla | modpack | custom -- picks the bake recipe
+#   SERVER_ACTION     create | save
+#   DEPLOY_REGION     the region the server is built INTO
+#   MC_VERSION        may be "latest" -- bake.py makes it concrete
+#   INSTANCE_TYPE     launch param, not baked into the image
+#   REGION_CONFIG     json blob: bucket, sg, instance profile, subnets
+#   DISCORD_USER_ID   owner
+#   DISCORD_GUILD_ID  for /list filtering
+#   DISCORD_APP_ID    the bot id, for the followup webhook
+#   DISCORD_TOKEN     the interaction token, so we edit the RIGHT message
+
+
+ # ----------------------------------------------------------
+ #                        SETUP
+ # ----------------------------------------------------------
+ phases:
+  install:
+    runtime-versions:
+      python: 3.12
+    commands:
+      - pip install -r requirements.txt
+
+
+
+
+
+
+
+
+
+
+
