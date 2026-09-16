@@ -8,6 +8,9 @@
 
 import os
 
+import discord
+from errors import BakeError
+
 
 
 # ==========================================================================================
@@ -37,3 +40,27 @@ def pick_recipe(server_type):
         raise ValueError(f"'{server_type}' isn't a server type I know how to bake :(")
 
     return RECIPES[server_type]()
+
+
+def main():
+
+    try:
+        # capture the server type used and get the class
+        recipe = pick_recipe(os.environ["SERVER_TYPE"])
+
+        # resolve the mc version and get the necessary info
+        recipe.resolve()
+
+    except BakeError as e:
+        discord.followup(str(e))
+        raise
+
+    except Exception:
+        discord.followup(f"The bake for `{os.environ.get('SERVER_NAME', '?')}` fell over. :(")
+        raise
+
+
+if __name__ == "__main__":
+    main()
+
+
