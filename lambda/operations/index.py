@@ -9,13 +9,13 @@
 # ==========================================================================================
 #                            IMPORTS AND DEPENDENCIES
 # ==========================================================================================
-import json
 import base64
-from nacl.signing import VerifyKey  # cryptographic library for verifying signatures
+import json
 
-from commands import template, region, update, server  # the actual command handlers
-from services import ssm  # ssm helpers -- call as ssm.get_discord_public_key(), ssm.get_parameter(), etc.
 import responses  # discord interaction-response builders -- responses.pong(), etc.
+from commands import region, server, template, update  # the actual command handlers
+from nacl.signing import VerifyKey  # cryptographic library for verifying signatures
+from services import ssm  # ssm helpers -- call as ssm.get_discord_public_key(), ssm.get_parameter(), etc.
 
 
 # ==========================================================================================
@@ -26,7 +26,7 @@ def handler(event, context):
     print("Received event:", json.dumps(event))  # log the incoming event for debugging
 
     # ====================================VERIFY DISCORD SIGNATURE================================
-    
+
     discord_public_key = ssm.get_discord_public_key()  # cached -- only hits ssm on the first (cold start) call
 
     rawBody = event["body"]  # capture the raw body FIRST - api gateway can mess with it before we verify
@@ -88,14 +88,13 @@ def handler(event, context):
     if body["type"] in (3, 5):
         # split ONCE -- everything after the first colon belongs to the handler, which is
         # what lets a custom_id carry state like "server:form:vanilla:us-east-1"
-        command, subcommand = body["data"]["custom_id"].split(':', 1)
+        command, subcommand = body["data"]["custom_id"].split(":", 1)
 
         if command == "region":
             return region.handle(subcommand, [], body)
 
         if command == "server":
             return server.handle(subcommand, [], body)
-
 
 
 # ==========================================================================================
@@ -116,4 +115,3 @@ def verify_signature(event, rawBody, public_key):
         print("Error occurred while verifying signature:", str(e))
         return False  # signature verification failed :(
     return True
-

@@ -1,6 +1,41 @@
 # ==========================================================================================
 #                              RUFF CONFIGURATION
 # ==========================================================================================
+# the ONE ruff config for the repo. both lambdas inherit it -- ruff walks up from
+# whatever directory it's invoked in, so `cd lambda/operations && ruff check .`
+# (what ci and the lambda-ci workflow both do) lands here.
 
 [tool.ruff]
 line-length = 160   # change the threshold of characters per line
+
+# ------------------------------------------------------------------------------------------
+# LINT
+# ------------------------------------------------------------------------------------------
+# `select` is deliberately LEFT AT THE DEFAULT. ruff's default set has grown over
+# time (0.16 lints a good deal more than the old E4/E7/E9/F), so what pins our
+# behaviour is the ruff VERSION pinned in lambda/*/requirements-dev.txt to match
+# the flake -- not a hand-maintained list here that'd rot on its own.
+[tool.ruff.lint]
+
+# rules turned off on purpose, with the reason. same spirit as the skip-check
+# list in .checkov.yaml -- a suppression with no reason next to it is a landmine
+ignore = [
+  # SIM114 wants `elif sub in ("stop", "delete", ...)` across the `pass` stubs in
+  # commands/server.py. those aren't duplicate branches, they're SCAFFOLDING --
+  # one labelled slot per subcommand, each waiting for its own body. merging them
+  # would collapse the exact structure the file is built around, and we'd have to
+  # unpick it again the moment /server stop gets implemented
+  "SIM114",
+
+  # BLE001 flags the 4 `except Exception` handlers. every one of them is a
+  # deliberate outermost boundary that MUST NOT let anything escape:
+  #   startup/index.py            -- a custom resource that doesn't respond leaves
+  #                                  the whole cloudformation stack hanging ~1hr
+  #   operations/index.py         -- discord gets a 3s timeout, an unhandled
+  #                                  exception there is a dead-looking bot
+  #   commands/server.py, services/codebuild.py
+  #                               -- turn any aws-side failure into a message a
+  #                                  human reads in discord instead of a 500
+  # they all log the exception, so nothing's being swallowed silently
+  "BLE001",
+]

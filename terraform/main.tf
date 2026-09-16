@@ -13,7 +13,7 @@ provider "aws" { # where Terraform should deploy to
 
   default_tags { # tagging for all the created resources -- really useful for the IAM policy
     tags = {
-      "Project" = "craftform"
+      "Project"     = "craftform"
       "Environment" = var.region
     }
   }
@@ -42,7 +42,7 @@ module "region" {
 
   # hand the module both providers: deployed + home
   providers = {
-    aws      = aws  # deployed region
+    aws      = aws      # deployed region
     aws.home = aws.home # home region
   }
 }

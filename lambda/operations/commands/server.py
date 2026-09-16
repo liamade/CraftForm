@@ -14,11 +14,12 @@
 # ║  modpack/custom later is additive, not a refactor.                           ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
-import re
 import json
-from services import ssm, codebuild
+import re
+
 import regions  # the catalog -- regions.label(code) for the friendly name
 import responses
+from services import codebuild, ssm
 
 # separate project from craftform-region: different IAM, and a bake shouldn't queue
 # behind a terraform run. hardcoded in the operations lambda's IAM policy too :)
@@ -31,11 +32,14 @@ NAME_PATTERN = re.compile(r"^[a-zA-Z0-9_.-]{3,32}$")
 VERSION_PATTERN = re.compile(r"^(latest|\d+\.\d+(\.\d+)?)$")
 
 # friendly size -> what we actually launch
+# fmt: off
 SIZES = {
     "small":  "t3.small",
     "medium": "t3.medium",
     "large":  "t3.large",
 }
+# fmt: on
+
 
 # ==========================================================================================
 #                                   /SERVER COMMAND
@@ -53,23 +57,22 @@ def handle(subcommand, options, body):
     # ===============================<CREATE>================================
     # ROLE: the heavy/async one. this lambda does ONLY the cheap part, then hands off to codebuild
     elif subcommand == "create":
-
         variant, args = create_args(options)
 
         # -------------------------------<VANILLA>-------------------------------
         if variant == "vanilla":
-
             # capture the region they selected. picking from the dropdown sends the CODE,
             # typing it by hand sends whatever they typed -- resolve() takes either
+            # fmt: off
             typed  = args.get("region", "")
             region = regions.resolve(typed)
+            # fmt: on
 
             # make sure the region is an actual, deployed region
             if not region or region not in ssm.list_names_under("/craftform/regions/"):
-                return responses.plain_message(
-                    f"`{typed}` isn't a deployed region — run `/region list` to see what's available."
-                )
+                return responses.plain_message(f"`{typed}` isn't a deployed region — run `/region list` to see what's available.")
 
+            # fmt: off
             return responses.modal(
                 f"server:form:{variant}:{region}:{subcommand}",
                 f"New {variant} server in {region}",
@@ -93,6 +96,7 @@ def handle(subcommand, options, body):
                     },
                 ],
             )
+            # fmt: on
 
         # -------------------------------<MODPACK>-------------------------------
         elif variant == "modpack":
@@ -122,7 +126,7 @@ def handle(subcommand, options, body):
         return responses.deferred()
 
     # ===============================<DELETE>================================
-    
+
     elif subcommand == "delete":
         pass
 
@@ -158,10 +162,11 @@ def handle(subcommand, options, body):
 # on the args. It returns the env dict for the build
 # ------------------------------------------------------------------------------------------
 def build_env(variant, region, fields, body, action):
-
+    # fmt: off
     name       = fields["name"].strip().lower()
     mc_version = fields["mc_version"].strip().lower()
     size       = fields["size"].strip().lower()
+    # fmt: on
 
     # -------------------------------<REJECTIONS>-------------------------------
     if not NAME_PATTERN.match(name):
@@ -186,6 +191,7 @@ def build_env(variant, region, fields, body, action):
 
     # --------------------------------<HANDOFF>---------------------------------
     # returns the env dict for the build, and None for the error if there is any.
+    # fmt: off
     return {
         "SERVER_NAME":      name,
         "SERVER_TYPE":      variant,       # vanilla | modpack | custom -- picks the bake recipe
@@ -199,6 +205,7 @@ def build_env(variant, region, fields, body, action):
         "DISCORD_APP_ID":   body["application_id"],
         "DISCORD_TOKEN":    body["token"],  # interaction token, NOT the bot token
     }, None
+    # fmt: on
 
 
 # ==========================================================================================
@@ -239,11 +246,8 @@ def autocomplete(options, body):
             if typed in code.lower() or typed in regions.label(code).lower():
                 deployed.append(code)
 
-
-        # return only the 
-        return responses.autocomplete(
-            [{"name": regions.label(code), "value": code} for code in sorted(deployed, key=regions.label)]
-        )
+        # return only the
+        return responses.autocomplete([{"name": regions.label(code), "value": code} for code in sorted(deployed, key=regions.label)])
 
     # return nothing if the focused option isn't the region one
     return responses.autocomplete([])
@@ -260,7 +264,7 @@ def focused_option(options):
             return option
         # if the option has nested options, keep going down until we find the focused one
         nested = focused_option(option.get("options", []))
-        
+
         # if focused option found in nested option list, just return
         if nested:
             return nested

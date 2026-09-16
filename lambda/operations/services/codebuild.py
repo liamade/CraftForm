@@ -8,7 +8,7 @@
 # ==========================================================================================
 #                                 CODEBUILD HELPERS
 # ==========================================================================================
-# anything that is too slow or will POTENTIALLY time out the lambda is offloaded to a 
+# anything that is too slow or will POTENTIALLY time out the lambda is offloaded to a
 # codebuild project. this is a shared helper to kick of those builds
 # ------------------------------------------------------------------------------------------
 from aws_clients import codebuild  # shared client -- made once per cold start
@@ -23,9 +23,7 @@ def start_build(project, env):
         codebuild.start_build(
             projectName=project,
             # builds out the environment variables for the build
-            environmentVariablesOverride=[
-                {"name": name, "value": str(value)} for name, value in env.items()
-            ],
+            environmentVariablesOverride=[{"name": name, "value": str(value)} for name, value in env.items()],
         )
         return True
 

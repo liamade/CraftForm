@@ -50,7 +50,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install cfn-lint
-        run: pip install cfn-lint
+        run: pip install cfn-lint==1.43.3   # pinned to the flake
 
       - name: Lint CloudFormation Templates
         run: cfn-lint ./cloudformation/*.yaml
@@ -84,7 +84,7 @@ jobs:
       - name: Set up TFLint
         uses: terraform-linters/setup-tflint@v6
         with:
-          tflint_version: v0.62.1
+          tflint_version: v0.64.0
 
       # configure the tflint and install plugins using terraform/.tflint.hcl to better lint for aws
       - name: Init TFLint Plugins
@@ -137,7 +137,7 @@ jobs:
 
       - name: Install Checkov
         run: |
-          pip install checkov
+          pip install checkov==3.3.9   # pinned to the flake
       
       - name: Run Checkov IAC Check
         run: |

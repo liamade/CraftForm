@@ -7,9 +7,10 @@
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 import json
-from services import ssm, s3, codebuild  # service helpers
+
 import regions  # the catalog -- regions.SUPPORTED (codes) + regions.label(code)
 import responses  # discord interaction-response builders
+from services import codebuild, s3, ssm  # service helpers
 
 # the prefix every deployed region's config lives under
 REGIONS_PREFIX = "/craftform/regions/"
@@ -18,6 +19,7 @@ REGIONS_PREFIX = "/craftform/regions/"
 # actions workflow. the operations lambda's IAM policy allows codebuild:StartBuild on craftform-*,
 # so this has to keep that prefix. servers get their own project, hence the -region suffix
 REGION_PROJECT = "craftform-region"
+
 
 # ==========================================================================================
 #                                   /REGION COMMAND
@@ -42,7 +44,6 @@ def handle(subcommand, options, body):
         # return the packet
         return responses.drop_down("Pick a region to deploy into:", "region:apply_create", "Choose a region...", options)
 
-
     # ================================<DELETE>================================
     if subcommand == "delete":
         # which regions are already deployed
@@ -66,16 +67,15 @@ def handle(subcommand, options, body):
     # =================================<APPLY>=================================
     if subcommand.startswith("apply"):
         # capture the action that is going to apply
-        action = subcommand.split('_')[1]
+        action = subcommand.split("_")[1]
 
         # capture the region
         region = body["data"]["values"][0]
 
         if action == "destroy":
-
             # guard the destroy -- if the region's s3 bucket still has objects in it
             bucket = ssm.region_config(region)["bucket_name"]
-            
+
             if s3.bucket_has_objects(bucket):
                 return responses.plain_message(
                     f"**{regions.label(region)}** still has world data stored in its S3 bucket "
@@ -83,22 +83,22 @@ def handle(subcommand, options, body):
                     "Please delete the objects in that bucket first, then run `/region delete` again. :)"
                 )
 
-
         # kick off the terraform build. nothing's been written yet, so there's no rollback here
+        # fmt: off
         queued = codebuild.start_build(REGION_PROJECT, {
             "DEPLOY_REGION":  region,                  # the region we're building INTO
             "TF_ACTION":      action,                  # create or destroy
             "DISCORD_APP_ID": body["application_id"],
             "DISCORD_TOKEN":  body["token"],           # interaction token, NOT the bot token
         })
+        # fmt: on
 
-        # the function returns false if the build didn't queue 
+        # the function returns false if the build didn't queue
         if not queued:
             return responses.plain_message("Couldn't kick off the terraform build :(")
 
         # tell discord we're thinking - the build will tell discord what happened :)
         return responses.deferred()
-
 
 
 # ==========================================================================================
@@ -109,12 +109,7 @@ def region_atlas(active_regions):
     if not active_regions:
         embed = {
             "title": "« CraftForm Atlas »",
-            "description": (
-                "```\n"
-                "  no regions forged yet  \n"
-                "```\n"
-                "The map is yours to draw — run `/region create` to plant the first flag."
-            ),
+            "description": ("```\n  no regions forged yet  \n```\nThe map is yours to draw — run `/region create` to plant the first flag."),
             "color": 0xFEE75C,  # warm yellow -- nothing's wrong, just waiting
         }
     # otherwise lay out every region CraftForm calls home
@@ -123,25 +118,22 @@ def region_atlas(active_regions):
             "title": "« CraftForm Atlas »",
             "description": (
                 "Every corner of the world under CraftForm's banner:\n\n"
-                + "\n".join(
-                    f"▪  {regions.label(region)}  ·  `{region}`"
-                    for region in sorted(active_regions)
-                )
+                + "\n".join(f"▪  {regions.label(region)}  ·  `{region}`" for region in sorted(active_regions))
             ),
             "color": 0x57F287,  # discord green -- alive and well
-            "footer": {
-                "text": f"{len(active_regions)} region(s) standing tall"
-            },
+            "footer": {"text": f"{len(active_regions)} region(s) standing tall"},
         }
 
     return {
         "statusCode": 200,
         "headers": {"Content-Type": "application/json"},
-        "body": json.dumps({
-            "type": 4,
-            "data": {
-                "flags": 64,  # only visible to the user who ran the command
-                "embeds": [embed],
+        "body": json.dumps(
+            {
+                "type": 4,
+                "data": {
+                    "flags": 64,  # only visible to the user who ran the command
+                    "embeds": [embed],
+                },
             }
-        })
+        ),
     }

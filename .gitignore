@@ -85,6 +85,11 @@ secrets.json
 # nix build output symlinks
 result
 result-*
+# the interpreter symlink `nix build .#python -o .python-env` drops. vscode
+# doesn't need it (direnv puts the shell on PATH and pylance follows), but
+# pycharm has no direnv and its sdk has to be an absolute path. doubles as a
+# gc root, so nix won't collect the interpreter the ide is pointed at :)
+.python-env
 # personal env overrides (AWS_PROFILE etc) that .envrc sources if present
 .envrc.local
 
@@ -95,7 +100,24 @@ result-*
 .vscode/*
 !.vscode/settings.json
 !.vscode/extensions.json
-.idea/
+# same deal for pycharm -- share the module, the interpreter NAME and the
+# inspection profile; keep the personal half out (window layout, local history,
+# caches, the aws toolkit's active region). misc.xml and the .iml reference the
+# sdk by name, so each machine makes its own "CraftForm flake (Python 3.12)"
+# pointing at its own .python-env
+#
+# runConfigurations/ is shared because the `ci` one is portable -- it's
+# $PROJECT_DIR$ plus `nix develop -c ci`, and nix is on PATH everywhere the
+# flake is. ruff.xml and terraform.xml are NOT shared: they hold absolute
+# /nix/store paths for this machine's ruff and terraform, which nobody else's
+# lock resolves to
+.idea/*
+!.idea/CraftForm.iml
+!.idea/misc.xml
+!.idea/modules.xml
+!.idea/vcs.xml
+!.idea/inspectionProfiles/
+!.idea/runConfigurations/
 *.swp
 *~
 

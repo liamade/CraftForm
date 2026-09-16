@@ -24,6 +24,7 @@ with open(_CATALOG, encoding="utf-8") as catalog:
 # get just the codes
 SUPPORTED = set(NAMES)
 
+
 # =====================================FRIENDLY LABEL====================================
 # get the pretty name for the region code, or just return the code if it's not already
 # in the catalog (shouldn't happen but like yaknow a lot of things that shouldn't happen do)
@@ -52,5 +53,3 @@ def resolve(text):
 
     # if nothing worked :(
     return None
-
-    

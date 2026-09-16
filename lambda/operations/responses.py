@@ -41,10 +41,10 @@ def deferred():
     return _respond({"type": 5})
 
 
-
 # ===================================PLAIN MESSAGE======================================
 # type 4 = immediate ephemeral text reply -- used when there's nothing fancy to show
 def plain_message(text):
+    # fmt: off
     return _respond({
         "type": 4,
         "data": {
@@ -52,12 +52,14 @@ def plain_message(text):
             "flags": EPHEMERAL,
         },
     })
+    # fmt: on
 
 
 # =====================================DROP DOWN========================================
 # type 4 with a string select menu. `options` is a ready-made list of
 # {"label": ..., "value": ...} dicts -- the CALLER builds those so we stay domain-agnostic
 def drop_down(content, custom_id, placeholder, options):
+    # fmt: off
     return _respond({
         "type": 4,
         "data": {
@@ -78,6 +80,7 @@ def drop_down(content, custom_id, placeholder, options):
             ],
         },
     })
+    # fmt: on
 
 
 # =======================================MODAL==========================================
@@ -87,6 +90,7 @@ def drop_down(content, custom_id, placeholder, options):
 # two discord rules, both silent failures if you break them: a modal must be an IMMEDIATE
 # response (no deferring first), and it's FIVE fields max, one per action row
 def modal(custom_id, title, fields):
+    # fmt: off
     return _respond({
         "type": 9,
         "data": {
@@ -111,23 +115,23 @@ def modal(custom_id, title, fields):
             ],
         },
     })
+    # fmt: on
 
 
 # ====================================AUTOCOMPLETE======================================
 # type 8 = the suggestion list shown while someone's still typing an option. `choices` is
 # a list of {"name": shown, "value": sent}. 25 MAX -- more and discord rejects the lot
 def autocomplete(choices):
+    # fmt: off
     return _respond({
         "type": 8,
         "data": {"choices": choices},
     })
+    # fmt: on
 
 
 # ==================================READ MODAL FIELDS===================================
 # flatten a modal submit to {custom_id: value}. values sit one layer deeper than
 # component interactions -- each input is wrapped in its own action row
 def modal_values(body):
-    return {
-        row["components"][0]["custom_id"]: row["components"][0]["value"]
-        for row in body["data"]["components"]
-    }
+    return {row["components"][0]["custom_id"]: row["components"][0]["value"] for row in body["data"]["components"]}

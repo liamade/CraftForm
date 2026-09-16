@@ -1,0 +1,32 @@
+{
+  // ╔══════════════════════════════════════════════════════════════════════════╗
+  // ║                              CraftForm                                   ║
+  // ╠══════════════════════════════════════════════════════════════════════════╣
+  // ║  VS CODE  ::  extensions.json                                            ║
+  // ║  What vscode offers to install when you open this repo. Recommendations  ║
+  // ║  only -- nobody's forced into anything, it just stops the "why is my     ║
+  // ║  nix file grey" round trip for the next person :)                        ║
+  // ╚══════════════════════════════════════════════════════════════════════════╝
+  "recommendations": [
+    // -------------------------------- NIX --------------------------------
+    // grammar for .nix (without it vscode has no idea what the file IS, so the
+    // whole thing renders as one flat colour) plus the hook into nixd
+    "jnoortheen.nix-ide",
+
+    // ------------------------------- DIRENV ------------------------------
+    // the one that actually matters. loads .envrc INTO vscode, so the integrated
+    // terminal and -- more importantly -- pylance both see the flake's python
+    // instead of the system one. without it the editor can't find pynacl or the
+    // boto3 stubs and underlines half the lambda code in red
+    "mkhl.direnv",
+
+    // ------------------------------- PYTHON ------------------------------
+    "ms-python.python",
+    "ms-python.vscode-pylance",
+    "charliermarsh.ruff", // same linter ci gates on -- see the format note below
+
+    // ------------------------------- IAC ---------------------------------
+    "hashicorp.terraform",
+    "redhat.vscode-yaml" // cloudformation, via the yaml.customTags in settings.json
+  ]
+}

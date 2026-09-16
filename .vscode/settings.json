@@ -1,4 +1,27 @@
 {
+    // ==================== NIX ====================
+    // the extension bundles no server, so point it at the flake's nixd. plain
+    // "nixd" works because direnv has already put the dev shell on PATH
+    "nix.enableLanguageServer": true,
+    "nix.serverPath": "nixd",
+    "nix.formatterPath": "nixfmt",
+
+    // ==================== FILE TYPES ====================
+    // .envrc is bash, but vscode has no reason to know that
+    "files.associations": {
+        ".envrc": "shellscript",
+        ".envrc.local": "shellscript"
+    },
+
+    // ==================== PYTHON ====================
+    // ruff is what ci gates on, so let it own linting in-editor too.
+    // format-on-save is deliberately OFF -- see the note in the chat, ruff would
+    // flatten the aligned comment blocks this codebase is written around
+    "[python]": {
+        "editor.defaultFormatter": "charliermarsh.ruff",
+        "editor.formatOnSave": false
+    },
+
     "azureTerraform.checkTerraformCmd": false,
     "yaml.customTags": [
         "!And sequence",

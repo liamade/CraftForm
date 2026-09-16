@@ -10,11 +10,12 @@
 # ==========================================================================================
 #                            IMPORTS AND DEPENDENCIES
 # ==========================================================================================
-import urllib3
 import json
-import boto3
 import os  # for accessing environment variables injected into the Lambda
-from discord_api import DiscordClient # import the discord client class from discord_api
+
+import boto3
+import urllib3
+from discord_api import DiscordClient  # import the discord client class from discord_api
 
 # ==========================================================================================
 #                            SECRETS
@@ -41,7 +42,6 @@ def handler(event, context):
     # ===============================RE-REGISTER COMMANDS ON UPDATE===============================
     # when someone runs /update, the staging function invokes this lambda to re-register commands
     if event.get("action") == "register_commands":
-
         # DISCORD VARIABLES AND CLIENT -- app id is injected as an env var, bot token comes from Secrets Manager
         discord_app_id = os.environ["DiscordAppId"]
         discord_bot_token = get_secrets()["Discord-Bot-Token"]
@@ -56,20 +56,16 @@ def handler(event, context):
             print(f"Failed to re-register commands: {e}")
             raise
 
-
         # ON SUCCESS
         return {"status": "commands registered :)"}  # staging only tells the user "done" once this comes back clean
-
-
 
     # ========================================STARTUP PATH========================================
 
     http = urllib3.PoolManager()  # init outside the try so the except/response path below can still reach it
 
     try:  # wrapping entire function in a try catch block because it makes it catches errors and also ensures when deleting cloudformation state, it deletes early
-
         # RUN -- make sure the startup script doesn't run on deletion
-        if event["RequestType"] != "Delete": 
+        if event["RequestType"] != "Delete":
             # ===============================INJECTED VARIABLES===============================
 
             aws_api_url = os.environ["ApiGatewayUrl"]
@@ -81,12 +77,10 @@ def handler(event, context):
 
             # set up discord client
             discord_client = DiscordClient(discord_bot_token, discord_app_id)
-            
-            discord_client.send_api_url(aws_api_url) # set the API Gateway URL as the interactions endpoint in the Discord
+
+            discord_client.send_api_url(aws_api_url)  # set the API Gateway URL as the interactions endpoint in the Discord
 
             discord_client.register_commands()  # register the slash commands with the Discord API
-
-
 
         # =================================SUCCESS RESPONSE=============================
         response = {

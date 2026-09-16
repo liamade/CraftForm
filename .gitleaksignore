@@ -1,0 +1,57 @@
+# ╔══════════════════════════════════════════════════════════════════════════════╗
+# ║                               CraftForm                                      ║
+# ╠══════════════════════════════════════════════════════════════════════════════╣
+# ║  SECURITY  ::  .gitleaksignore                                               ║
+# ║  Fingerprints gitleaks is told to shut up about. Read by BOTH the local      ║
+# ║  `ci` runner and the gitleaks action -- neither needs a flag, they both      ║
+# ║  pick this up from the repo root on their own.                               ║
+# ║                                                                              ║
+# ║  Format: <commit>:<path>:<rule>:<line>. It's a fingerprint, not a path       ║
+# ║  glob -- pinning the commit means a REAL secret landing in one of these      ║
+# ║  files later still gets caught, because it'd be a different commit :)        ║
+# ╚══════════════════════════════════════════════════════════════════════════════╝
+
+# ==============================================================================
+# Vendored PyNaCl -- false positives
+# ==============================================================================
+# back in may/june both lambdas had their dependencies committed straight into
+# the repo instead of being pip-installed at build time. that's long gone (the
+# release workflow builds them now) and the paths below don't exist any more,
+# but gitleaks scans HISTORY -- the blobs are still in the commits that added
+# them, so these 14 hits are permanent until the history itself is rewritten.
+#
+# all 14 are gitleaks' `generic-api-key` rule firing on VARIABLE NAMES, not on
+# any value. that rule looks for words like passwd / secret / key / token sat
+# next to an `=`, and pynacl's own source is full of them:
+#
+#     PASSWD_MIN = _argon2.PASSWD_MIN                    <- "passwd" + "="
+#     PASSWD_MAX = _argon2.PASSWD_MAX                    <- same
+#     curve_secret_key_len = crypto_sign_curve25519_BYTES   <- "secret_key" + "="
+#
+# the "secret" it reports is the right-hand side -- another module constant.
+# nothing was ever redacted here because there was never anything to redact :)
+#
+# see for yourself, no need to take my word for it:
+#     git show 8c1167b4:lambda/startup/nacl/pwhash/argon2i.py | sed -n '25,26p'
+#
+# regenerate the list with:
+#     gitleaks git . --report-format json --report-path /tmp/leaks.json
+#     jq -r '.[] | .Fingerprint' /tmp/leaks.json | sort
+
+# ---- lambda/startup  (8c1167b4, 2026-05-24) ----
+8c1167b47f25d33f5f1447c8673a1de5d088109a:lambda/startup/nacl/bindings/crypto_sign.py:generic-api-key:150
+8c1167b47f25d33f5f1447c8673a1de5d088109a:lambda/startup/nacl/pwhash/__init__.py:generic-api-key:27
+8c1167b47f25d33f5f1447c8673a1de5d088109a:lambda/startup/nacl/pwhash/__init__.py:generic-api-key:28
+8c1167b47f25d33f5f1447c8673a1de5d088109a:lambda/startup/nacl/pwhash/argon2i.py:generic-api-key:25
+8c1167b47f25d33f5f1447c8673a1de5d088109a:lambda/startup/nacl/pwhash/argon2i.py:generic-api-key:26
+8c1167b47f25d33f5f1447c8673a1de5d088109a:lambda/startup/nacl/pwhash/argon2id.py:generic-api-key:25
+8c1167b47f25d33f5f1447c8673a1de5d088109a:lambda/startup/nacl/pwhash/argon2id.py:generic-api-key:26
+
+# ---- lambda/operations  (7f76991e, 2026-05-30) ----
+7f76991e743a51b45b0015f0a1cbba6c403eb788:lambda/operations/nacl/bindings/crypto_sign.py:generic-api-key:150
+7f76991e743a51b45b0015f0a1cbba6c403eb788:lambda/operations/nacl/pwhash/__init__.py:generic-api-key:27
+7f76991e743a51b45b0015f0a1cbba6c403eb788:lambda/operations/nacl/pwhash/__init__.py:generic-api-key:28
+7f76991e743a51b45b0015f0a1cbba6c403eb788:lambda/operations/nacl/pwhash/argon2i.py:generic-api-key:25
+7f76991e743a51b45b0015f0a1cbba6c403eb788:lambda/operations/nacl/pwhash/argon2i.py:generic-api-key:26
+7f76991e743a51b45b0015f0a1cbba6c403eb788:lambda/operations/nacl/pwhash/argon2id.py:generic-api-key:25
+7f76991e743a51b45b0015f0a1cbba6c403eb788:lambda/operations/nacl/pwhash/argon2id.py:generic-api-key:26

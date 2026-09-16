@@ -8,8 +8,8 @@
 
 import json
 
-from aws_clients import lambda_client  # shared client -- no need to build our own
 import responses  # discord interaction-response builders -- responses.deferred(), etc.
+from aws_clients import lambda_client  # shared client -- no need to build our own
 
 
 # ==========================================================================================

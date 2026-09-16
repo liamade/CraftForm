@@ -46,24 +46,48 @@
           permittedInsecurePackages = [ "python3.14-ecdsa-0.19.2" ];
         };
       }));
+
+      # ====================================================================
+      #                              PYTHON
+      # ====================================================================
+      # mirrors lambda/*/requirements-dev.txt with cfn-lint bolted on. ONE
+      # interpreter for the whole repo, so mypy sees exactly the stubs the
+      # rest of the tooling does.
+      #
+      # lives up HERE rather than inside the devShell's let so `packages.python`
+      # can hand an editor the exact same derivation the shell uses -- an ide
+      # pointed at a different interpreter is an ide that disagrees with ci
+      pythonFor = pkgs: pkgs.python312.withPackages (ps: [
+        ps.cfn-lint     # the ci gate on cloudformation/*.yaml
+        ps.mypy         # type check
+        ps.bandit       # python security scan
+        ps.pynacl       # operations lambda -- verifies discord's ed25519 sigs
+        ps.urllib3      # both lambdas -- the discord + cloudformation http calls
+        ps.boto3-stubs  # what lets mypy understand the boto3 client calls
+      ] ++ ps.boto3-stubs.optional-dependencies.essential); # the [essential] extra
     in
     {
+      # ======================================================================
+      #                          THE EDITOR INTERPRETER
+      # ======================================================================
+      # `nix build .#python -o .python-env` drops a stable symlink at the repo
+      # root pointing at the interpreter below.
+      #
+      # vscode doesn't need this -- the direnv extension puts the dev shell on
+      # PATH and pylance follows. pycharm has no direnv, so its sdk has to be an
+      # absolute path. aim it at .python-env/bin/python3.12 ONCE and a flake.lock
+      # bump just moves the symlink underneath it, instead of leaving the ide
+      # quietly pinned to a stale /nix/store path that nothing else uses :)
+      #
+      # .python-env is gitignored -- it's a nix gc root, same as .direnv
+      packages = forAllSystems (pkgs: {
+        python = pythonFor pkgs;
+      });
+
       devShells = forAllSystems (pkgs:
         let
-          # ====================================================================
-          #                              PYTHON
-          # ====================================================================
-          # mirrors lambda/*/requirements-dev.txt with cfn-lint bolted on. ONE
-          # interpreter for the whole repo, so mypy sees exactly the stubs the
-          # rest of the tooling does
-          python = pkgs.python312.withPackages (ps: [
-            ps.cfn-lint     # the ci gate on cloudformation/*.yaml
-            ps.mypy         # type check
-            ps.bandit       # python security scan
-            ps.pynacl       # operations lambda -- verifies discord's ed25519 sigs
-            ps.urllib3      # both lambdas -- the discord + cloudformation http calls
-            ps.boto3-stubs  # what lets mypy understand the boto3 client calls
-          ] ++ ps.boto3-stubs.optional-dependencies.essential); # the [essential] extra
+          # the one from up top -- see the note next to pythonFor
+          python = pythonFor pkgs;
 
           # ====================================================================
           #                            THE CI RUNNER
@@ -154,6 +178,15 @@
 
               # ================= PYTHON TOOLING ==============
               pkgs.ruff       # format + lint. the standalone binary, same as pip's
+
+              # ================ EDITOR SUPPORT ===============
+              # the vscode Nix IDE extension shells out to these -- it does syntax
+              # highlighting on its own, but completions/jump-to-def need a server.
+              # keeping them in the flake means anyone who opens the repo gets the
+              # same ones, instead of hunting for a matching global install :)
+              pkgs.nixd       # nix language server. actually EVALUATES, so `pkgs.<tab>`
+                              # completes against real nixpkgs instead of guessing
+              pkgs.nixfmt     # the official formatter (rfc-style)
 
               # ================ EVERYTHING ELSE ==============
               pkgs.gitleaks   # the secret scan ci runs on every push

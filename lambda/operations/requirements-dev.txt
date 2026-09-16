@@ -1,13 +1,21 @@
 #=====================================================================
 #                        CI - DEPENDENCIES
 #=====================================================================
-
+# every version here is PINNED to whatever the nix flake resolves to, so `ci` on
+# a laptop and lambda-ci.yaml on github run the exact same tools. left unpinned,
+# the workflow pip-installs whatever is newest that morning and quietly drifts
+# away from the dev shell -- ruff especially, its DEFAULT rule set keeps growing,
+# so an unpinned bump can turn a green branch red without a line of code changing
+#
+# dependabot already watches this directory (see .github/dependabot.yaml), so the
+# pins get bump PRs on their own. when one lands, move the flake's nixpkgs input
+# in the same breath or the drift just points the other way :)
 
 
 -r requirements.txt     # install the dependencies for the lambda code too
 
 
-ruff    
-mypy
-boto3-stubs[essential]  # gives mypy the stubs for boto3
-bandit
+ruff==0.16.4                        # pkgs.ruff
+mypy==2.1.0                         # ps.mypy
+bandit==1.9.4                       # ps.bandit
+boto3-stubs[essential]==1.43.83     # ps.boto3-stubs -- gives mypy the stubs for boto3

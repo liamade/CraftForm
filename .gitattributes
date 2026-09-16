@@ -1,0 +1,43 @@
+# ╔══════════════════════════════════════════════════════════════════════════════╗
+# ║                               CraftForm                                      ║
+# ╠══════════════════════════════════════════════════════════════════════════════╣
+# ║  GIT  ::  .gitattributes                                                     ║
+# ║  Line endings. 19 tracked files drifted to CRLF before this existed --       ║
+# ║  every workflow, all of terraform/, and the startup lambda.                  ║
+# ║                                                                              ║
+# ║  This stops NEW ones appearing. It does NOT retroactively fix the existing   ║
+# ║  ones -- that's a deliberate one-off, best as its own commit:                ║
+# ║      git add --renormalize . && git commit -m "normalise line endings"       ║
+# ╚══════════════════════════════════════════════════════════════════════════════╝
+
+# default: git decides what's text, and stores text as LF in the repo no matter
+# what the working tree looks like
+* text=auto
+
+# ==============================================================================
+# Force LF -- things that are READ BY A LINUX SHELL and break on \r
+# ==============================================================================
+# a CR riding on the end of a buildspec line becomes part of the command, and
+# you get to debug `terraform: command not found\r` inside codebuild :(
+*.sh        text eol=lf
+*.py        text eol=lf
+*.yaml      text eol=lf
+*.yml       text eol=lf
+*.tf        text eol=lf
+*.hcl       text eol=lf
+*.nix       text eol=lf
+*.json      text eol=lf
+*.txt       text eol=lf
+.envrc      text eol=lf
+.envrc.*    text eol=lf
+.gitignore  text eol=lf
+.gitleaksignore text eol=lf
+
+# ==============================================================================
+# Binary -- never touch, never diff
+# ==============================================================================
+*.zip       binary
+*.png       binary
+*.jpg       binary
+*.gz        binary
+*.pem       binary

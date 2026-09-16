@@ -8,10 +8,11 @@
 # ==========================================================================================
 #                               SECRETS MANAGER HELPERS
 # ==========================================================================================
-# everything in this lambda reads from the same "craftform-secrets" bundle  this centralizes 
+# everything in this lambda reads from the same "craftform-secrets" bundle  this centralizes
 # the secret id and the fetch+parse so the command files stay clean
 # ------------------------------------------------------------------------------------------
 import json
+
 from aws_clients import secrets  # shared client -- made once per cold start
 
 # the one secret bundle this whole lambda reads from

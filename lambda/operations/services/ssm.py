@@ -13,6 +13,7 @@
 # minimize the code in other files
 # ------------------------------------------------------------------------------------------
 import json
+
 from aws_clients import ssm  # shared client -- made once per cold start
 
 
@@ -31,15 +32,17 @@ def list_names_under(prefix):
     for page in paginator.paginate(Path=prefix, Recursive=True):
         for param in page["Parameters"]:
             # chop the prefix off, then take the FIRST segment after it = the resource name
-            name = param["Name"][len(prefix):].split("/")[0]
+            name = param["Name"][len(prefix) :].split("/")[0]
             if name and name not in names:  # dedupe -- multiple params per resource is fine
                 names.append(name)
 
     return names
 
+
 # =====================================GET A VARIABLE====================================
 def get_parameter(name):
     return ssm.get_parameter(Name=name)["Parameter"]["Value"]
+
 
 # ====================================GET A JSON DICT====================================
 def get_dict(name):
