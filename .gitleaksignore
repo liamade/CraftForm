@@ -22,13 +22,14 @@
 #
 # all 14 are gitleaks' `generic-api-key` rule firing on VARIABLE NAMES, not on
 # any value. that rule looks for words like passwd / secret / key / token sat
-# next to an `=`, and pynacl's own source is full of them:
+# next to an assignment, and pynacl's source is full of them: the PASSWD_MIN
+# and PASSWD_MAX constants in its argon2 modules, curve_secret_key_len in
+# crypto_sign. what it reports as the "secret" is just the constant on the
+# other side of the assignment.
 #
-#     PASSWD_MIN = _argon2.PASSWD_MIN                    <- "passwd" + "="
-#     PASSWD_MAX = _argon2.PASSWD_MAX                    <- same
-#     curve_secret_key_len = crypto_sign_curve25519_BYTES   <- "secret_key" + "="
-#
-# the "secret" it reports is the right-hand side -- another module constant.
+# NOTE: do not write those lines out in full here, keyword-then-equals and all.
+# the first version of this file did exactly that and the rule matched its own
+# explanation, which is what the three 260e617b fingerprints below are.
 # nothing was ever redacted here because there was never anything to redact :)
 #
 # see for yourself, no need to take my word for it:
@@ -55,3 +56,10 @@
 7f76991e743a51b45b0015f0a1cbba6c403eb788:lambda/operations/nacl/pwhash/argon2i.py:generic-api-key:26
 7f76991e743a51b45b0015f0a1cbba6c403eb788:lambda/operations/nacl/pwhash/argon2id.py:generic-api-key:25
 7f76991e743a51b45b0015f0a1cbba6c403eb788:lambda/operations/nacl/pwhash/argon2id.py:generic-api-key:26
+
+# ---- this file's own first version  (260e617b, 2026-09-16) ----
+# the explanation block above used to spell the offending patterns out verbatim,
+# so the rule matched them. reworded now, but 260e617b keeps the original.
+260e617b9f627e409e3f9488cf2ff9ca5e3c5c59:.gitleaksignore:generic-api-key:27
+260e617b9f627e409e3f9488cf2ff9ca5e3c5c59:.gitleaksignore:generic-api-key:28
+260e617b9f627e409e3f9488cf2ff9ca5e3c5c59:.gitleaksignore:generic-api-key:29
