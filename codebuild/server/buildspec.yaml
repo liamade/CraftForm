@@ -11,7 +11,6 @@
 #║  the project names this one explicitly -> BuildSpec: buildspec.yaml          ║
 #╚══════════════════════════════════════════════════════════════════════════════╝
 
-version: 0.2   # the buildspec format version, not ours
 
 #============================================================
 #                 VARIABLE SETTINGS
@@ -35,16 +34,31 @@ version: 0.2   # the buildspec format version, not ours
 #   DISCORD_APP_ID    the bot id, for the followup webhook
 #   DISCORD_TOKEN     the interaction token, so we edit the RIGHT message
 
+version: 0.2   # the buildspec format version, not ours
+
+env:
+  variables:
+    PYTHONUNBUFFERED: "1"   # print() lands in cloudwatch in order, not at flush
+
+phases:
 
  # ----------------------------------------------------------
  #                        SETUP
  # ----------------------------------------------------------
- phases:
   install:
     runtime-versions:
       python: 3.12
     commands:
       - pip install -r requirements.txt
+
+ # ----------------------------------------------------------
+ #                        THE BAKE
+ # ----------------------------------------------------------
+  build:
+    commands:
+      - python bake.py
+      - python bake.py
+
 
 
 
