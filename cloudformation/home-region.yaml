@@ -333,6 +333,7 @@ Resources:
                       - CreateVolume
                       - CreateSnapshot
                       - RegisterImage
+                      - CreateImage
 
               # ======================= drive + wire up the builder =======================
               # attach/detach need the permission to hold on BOTH the volume AND the
@@ -367,10 +368,30 @@ Resources:
                   - ec2:DeregisterImage
                 Resource: arn:aws:ec2:*::image/*
 
+              # placeholder: CreateImage is split because the instance checks ResourceTag while the new image + snapshot check RequestTag
+              - Sid: ImageBuilder
+                Effect: Allow
+                Action: ec2:CreateImage
+                Resource: !Sub arn:aws:ec2:*:${AWS::AccountId}:instance/*
+                Condition:
+                  StringEquals:
+                    aws:ResourceTag/Project: craftform
+                    aws:ResourceTag/Role: builder
+
+              - Sid: ImageBuilderOutput
+                Effect: Allow
+                Action: ec2:CreateImage
+                Resource:
+                  - arn:aws:ec2:*::image/*
+                  - arn:aws:ec2:*::snapshot/*
+                Condition:
+                  StringEquals:
+                    aws:RequestTag/Project: craftform
+
               - Sid: PruneSnapshots
                 Effect: Allow
                 Action: ec2:DeleteSnapshot
-                Resource: !Sub arn:aws:ec2:*:${AWS::AccountId}:snapshot/*
+                Resource: arn:aws:ec2:*::snapshot/*
                 Condition:
                   StringEquals:
                     aws:ResourceTag/Project: craftform

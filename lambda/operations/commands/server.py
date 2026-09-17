@@ -34,9 +34,9 @@ VERSION_PATTERN = re.compile(r"^(latest|\d+\.\d+(\.\d+)?)$")
 # friendly size -> what we actually launch
 # fmt: off
 SIZES = {
-    "small":  "t3.small",
-    "medium": "t3.medium",
-    "large":  "t3.large",
+    "small":  "m8g.large",
+    "medium": "m8g.xlarge",
+    "large":  "m8g.2xlarge",
 }
 # fmt: on
 

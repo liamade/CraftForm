@@ -70,9 +70,6 @@ class Vanilla:
         if "server" not in version_data["downloads"]: raise BakeError(f"Minecraft {mc_version} has no server download.")
         if "javaVersion" not in version_data: raise BakeError(f"Mojang doesn't list a Java version for {mc_version}.")
 
-
-
-
         # capture the results
         self.mc_version = version_data["id"]
         self.jar_url = version_data["downloads"]["server"]["url"]
