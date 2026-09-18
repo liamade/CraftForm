@@ -30,7 +30,16 @@ RECIPES = {
     # "custom":  Custom,
 }
 BUILDER_TYPE = "t4g.small"
-
+BUILDER_TAGS = [
+    {
+        "Key": "Project",
+        "Value": "craftform",
+    },
+    {
+        "Key": "Role",
+        "Value": "builder",
+    }
+]
 
 # =====================================PICK THE RECIPE=====================================
 # hands back the class already instantiated -- the constructor reads whatever env vars that
@@ -70,6 +79,31 @@ def instance_details(ec2, config):
 
     return base_image, subnet
 
+def start_instance(ec2,config, base_image, subnet):
+    # launch the ec2
+    response = ec2.run_instances(
+        ImageId=base_image,
+        InstanceType=BUILDER_TYPE,
+        MinCount=1,
+        MaxCount=1,
+        SubnetId=subnet,
+        SecurityGroupIds=[config["security_group"]],
+        TagSpecifications=[
+            {
+                "ResourceType": "instance",
+                'Tags': BUILDER_TAGS
+            },
+            {
+                "ResourceType": "volume",
+                'Tags': BUILDER_TAGS
+            }
+        ]
+
+    )
+
+    # check the response back -- boto3 cancels the request if there's an error for me already so i don't have to check it
+    print("Server created successfully :))")
+    return response['Instances'][0]['InstanceId']
 
 def main():
 
@@ -88,11 +122,10 @@ def main():
         base_image, subnet = instance_details(ec2, config)
 
         # launch the ec2
-
-        # check the response back
-
+        instance_id = start_instance(ec2, config, base_image, subnet)
 
         # send the boot script
+
 
 
 
