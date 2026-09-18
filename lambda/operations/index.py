@@ -29,14 +29,14 @@ def handler(event, context):
 
     discord_public_key = ssm.get_discord_public_key()  # cached -- only hits ssm on the first (cold start) call
 
-    rawBody = event["body"]  # capture the raw body FIRST - api gateway can mess with it before we verify
+    raw_body = event["body"]  # capture the raw body FIRST - api gateway can mess with it before we verify
 
     # API Gateway may base64 encode the body when forwarding to Lambda
     if event.get("isBase64Encoded", False):
-        rawBody = base64.b64decode(rawBody).decode()  # decode it back to a string if it was encoded
+        raw_body = base64.b64decode(raw_body).decode()  # decode it back to a string if it was encoded
 
     print("Verifying signature....")
-    if not verify_signature(event, rawBody, discord_public_key):
+    if not verify_signature(event, raw_body, discord_public_key):
         print("Signature verification FAILED :(")
         return {
             "statusCode": 401,
@@ -45,7 +45,7 @@ def handler(event, context):
 
     print("Signature verification SUCCESS :)")
 
-    body = json.loads(rawBody)  # safe to parse now that the signature is verified
+    body = json.loads(raw_body)  # safe to parse now that the signature is verified
 
     print("Interaction type:", body["type"])
 
@@ -100,7 +100,7 @@ def handler(event, context):
 # ==========================================================================================
 #                    VERIFY DISCORD SIGNATURE AND HANDLE INTERACTIONS
 # ==========================================================================================
-def verify_signature(event, rawBody, public_key):
+def verify_signature(event, raw_body, public_key):
 
     signature = event["headers"]["x-signature-ed25519"]  # get the signature from the request headers
     timestamp = event["headers"]["x-signature-timestamp"]  # get the timestamp from the request headers
@@ -108,7 +108,7 @@ def verify_signature(event, rawBody, public_key):
     try:
         verify_key = VerifyKey(bytes.fromhex(public_key))  # convert the public key from hex to a PyNaCL VerifyKey object
         verify_key.verify(
-            timestamp.encode() + rawBody.encode(), bytes.fromhex(signature)
+            timestamp.encode() + raw_body.encode(), bytes.fromhex(signature)
         )  # combine timestamp and body, then verify the signature against the public key
 
     except Exception as e:  # catch any exceptions because discord sends a bad ping when first setting up the interactions endpoint

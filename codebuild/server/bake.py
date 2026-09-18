@@ -87,6 +87,13 @@ def main():
         # get the deployment details for the instance
         base_image, subnet = instance_details(ec2, config)
 
+        # launch the ec2
+
+        # check the response back
+
+
+        # send the boot script
+
 
 
 

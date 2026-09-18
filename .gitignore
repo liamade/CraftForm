@@ -90,6 +90,9 @@ result-*
 # pycharm has no direnv and its sdk has to be an absolute path. doubles as a
 # gc root, so nix won't collect the interpreter the ide is pointed at :)
 .python-env
+# PLACEHOLDER COMMENT -- same idea for the tools pycharm pins by absolute path
+# (`nix build .#dev-tools -o .dev-env`); also a gc root
+.dev-env
 # personal env overrides (AWS_PROFILE etc) that .envrc sources if present
 .envrc.local
 

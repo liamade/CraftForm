@@ -2,6 +2,9 @@
 <module type="PYTHON_MODULE" version="4">
   <component name="NewModuleRootManager">
     <content url="file://$MODULE_DIR$">
+      <sourceFolder url="file://$MODULE_DIR$/lambda/operations" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/lambda/startup" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/codebuild/server" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/.python-env/lib/python3.12" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/.python-env/lib/python3.12/lib-dynload" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/.python-env/lib/python3.12/site-packages" isTestSource="false" />

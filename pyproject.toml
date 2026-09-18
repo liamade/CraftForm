@@ -17,6 +17,9 @@ line-length = 160   # change the threshold of characters per line
 # the flake -- not a hand-maintained list here that'd rot on its own.
 [tool.ruff.lint]
 
+# placeholder: pep8-naming on top of the default set
+extend-select = ["N"]
+
 # rules turned off on purpose, with the reason. same spirit as the skip-check
 # list in .checkov.yaml -- a suppression with no reason next to it is a landmine
 ignore = [

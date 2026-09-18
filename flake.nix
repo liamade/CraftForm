@@ -64,7 +64,10 @@
         ps.pynacl       # operations lambda -- verifies discord's ed25519 sigs
         ps.urllib3      # both lambdas -- the discord + cloudformation http calls
         ps.boto3-stubs  # what lets mypy understand the boto3 client calls
-      ] ++ ps.boto3-stubs.optional-dependencies.essential); # the [essential] extra
+        ps.pytest       # PLACEHOLDER COMMENT -- the test runner
+      ] ++ (with ps.boto3-stubs.optional-dependencies;
+              # PLACEHOLDER COMMENT -- [essential] covers s3/ec2/lambda but not these three
+              essential ++ ssm ++ secretsmanager ++ codebuild));
     in
     {
       # ======================================================================
@@ -82,6 +85,14 @@
       # .python-env is gitignored -- it's a nix gc root, same as .direnv
       packages = forAllSystems (pkgs: {
         python = pythonFor pkgs;
+
+        # PLACEHOLDER COMMENT -- same trick as .python-env, for the tools pycharm
+        # pins by absolute path. `nix build .#dev-tools -o .dev-env` once, then the
+        # ide points at .dev-env/bin/<tool> and a flake.lock bump just moves it
+        dev-tools = pkgs.symlinkJoin {
+          name = "craftform-dev-tools";
+          paths = [ pkgs.ruff pkgs.terraform ];
+        };
       });
 
       devShells = forAllSystems (pkgs:
