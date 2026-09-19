@@ -7,6 +7,7 @@
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 import os
+import time
 
 import discord
 from errors import BakeError
@@ -41,7 +42,7 @@ BUILDER_TAGS = [
     }
 ]
 
-# =====================================PICK THE RECIPE=====================================
+# =====================================PICK THE RECIPE======================================
 # hands back the class already instantiated -- the constructor reads whatever env vars that
 # type needs, so main just holds a recipe from here on
 # ------------------------------------------------------------------------------------------
@@ -52,6 +53,10 @@ def pick_recipe(server_type):
 
     return RECIPES[server_type]()
 
+# =====================================INSTANCE DETAILS=====================================
+# the two things that change per-bake -- newest arm64 al2023, and a subnet in an az that
+# actually offers the builder type today
+# ------------------------------------------------------------------------------------------
 def instance_details(ec2, config):
 
     # capture the available images offered by amazon and have the specific name
@@ -79,6 +84,10 @@ def instance_details(ec2, config):
 
     return base_image, subnet
 
+# ====================================START THE INSTANCE====================================
+# launches the builder and hands back its id -- the tags aren't decoration, SendCommand is
+# scoped to Role=builder so it can't drive anything else
+# ------------------------------------------------------------------------------------------
 def start_instance(ec2,config, base_image, subnet):
     # launch the ec2
     response = ec2.run_instances(
@@ -88,6 +97,8 @@ def start_instance(ec2,config, base_image, subnet):
         MaxCount=1,
         SubnetId=subnet,
         SecurityGroupIds=[config["security_group"]],
+        # the badge the agent needs to register -- borrowed off the region's server profile :)
+        IamInstanceProfile={"Name": config["instance_profile"]},
         TagSpecifications=[
             {
                 "ResourceType": "instance",
@@ -105,6 +116,32 @@ def start_instance(ec2,config, base_image, subnet):
     print("Server created successfully :))")
     return response['Instances'][0]['InstanceId']
 
+# ====================================WAIT FOR THE AGENT====================================
+# running just means the hardware's on -- the agent needs another minute to check in, and
+# SendCommand throws InvalidInstanceId until it does. no boto3 waiter for this one :(
+# ------------------------------------------------------------------------------------------
+def wait_for_ssm(ssm, instance_id, timeout=300):
+
+    deadline = time.time() + timeout
+
+    while time.time() < deadline:
+
+        # comes back empty until it registers -- that's the wait, not an error
+        registered = ssm.describe_instance_information(
+            Filters=[{"Key": "InstanceIds", "Values": [instance_id]}]
+        )["InstanceInformationList"]
+
+        if registered and registered[0]["PingStatus"] == "Online":
+            print("Builder checked in with ssm :))")
+            return
+
+        time.sleep(10)
+
+    raise BakeError("The builder never checked in with SSM, so the bake can't start :(")
+
+# ===========================================MAIN===========================================
+# type-blind start to finish -- pick a recipe, resolve it, stand up a builder, bake on it
+# ------------------------------------------------------------------------------------------
 def main():
 
     try:
@@ -114,8 +151,10 @@ def main():
         # resolve the mc version and get the necessary info
         recipe.resolve()
 
-        # create the ec2 client within the specified region
+        # both clients live in the DEPLOY region -- the agent checks in where the box lives,
+        # so a home-region ssm client would never see the builder
         ec2 = boto3.client("ec2", region_name=os.environ["DEPLOY_REGION"])
+        ssm = boto3.client("ssm", region_name=os.environ["DEPLOY_REGION"])
         config = json.loads(os.environ["REGION_CONFIG"])
 
         # get the deployment details for the instance
@@ -123,6 +162,12 @@ def main():
 
         # launch the ec2
         instance_id = start_instance(ec2, config, base_image, subnet)
+
+        # wait for the hardware to come up -- blocks until it's running or raises WaiterError
+        ec2.get_waiter("instance_running").wait(InstanceIds=[instance_id])
+
+        # then wait for the agent inside it to actually check in with ssm
+        wait_for_ssm(ssm, instance_id)
 
         # send the boot script
 
