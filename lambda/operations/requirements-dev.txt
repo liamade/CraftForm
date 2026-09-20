@@ -15,7 +15,7 @@
 -r requirements.txt     # install the dependencies for the lambda code too
 
 
-ruff==0.16.4                                                   # pkgs.ruff
+ruff==0.16.8                                                   # pkgs.ruff
 mypy==2.1.0                                                    # ps.mypy
 bandit==1.9.4                                                  # ps.bandit
 pytest==9.1.1                                                  # ps.pytest
