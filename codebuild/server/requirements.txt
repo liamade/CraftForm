@@ -2,4 +2,4 @@
 
 
 boto3
-urllib3
+urllib3>2

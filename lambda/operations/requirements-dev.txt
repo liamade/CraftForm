@@ -15,8 +15,8 @@
 -r requirements.txt     # install the dependencies for the lambda code too
 
 
-ruff==0.16.8                                                   # pkgs.ruff
-mypy==2.1.0                                                    # ps.mypy
+ruff==0.16.4                                                   # pkgs.ruff
+mypy==2.3.1                                                    # ps.mypy
 bandit==1.9.4                                                  # ps.bandit
 pytest==9.1.1                                                  # ps.pytest
-boto3-stubs[essential,ssm,secretsmanager,codebuild]==1.43.83   # ps.boto3-stubs -- gives mypy the stubs for boto3
+boto3-stubs[essential,ssm,secretsmanager,codebuild]==1.43.96   # ps.boto3-stubs -- gives mypy the stubs for boto3

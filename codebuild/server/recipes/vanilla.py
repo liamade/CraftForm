@@ -1,7 +1,7 @@
 
 
 
-import os, json, urllib3
+import os, urllib3
 
 from errors import BakeError
 
@@ -9,20 +9,22 @@ from errors import BakeError
 
 class Vanilla:
 
-    def __init__(self):
+    def __init__(self, mc_version: str, jar_url: str, jar_sha1: str, java_version: str):
         self.server_type = os.environ["SERVER_TYPE"]
 
-        # start the http client
-        self.http = urllib3.PoolManager(timeout=10)
-
         # mc details
-        self.mc_version = None
-        self.jar_url = None
-        self.jar_sha1 = None
-        self.java_version = None
+        self.mc_version = mc_version
+        self.jar_url = jar_url
+        self.jar_sha1 = jar_sha1
+        self.java_version = java_version
 
     # resolve the recipe's build parameters from the environment variables
-    def resolve(self):
+    @classmethod
+    def resolve(cls):
+
+        http = urllib3.PoolManager(timeout=10)
+
+
         # import env variables
         mc_version = os.environ["MC_VERSION"]
 
@@ -31,7 +33,7 @@ class Vanilla:
 
         # get the big boy manifest
         try:
-            manifest = self.http.request(
+            manifest = http.request(
                 "GET",
                 manifest_url
             )
@@ -54,7 +56,7 @@ class Vanilla:
 
         # make a request on the exact version to get the server jar and java version
         try:
-            manifest = self.http.request(
+            manifest = http.request(
                 "GET",
                 version["url"]
             )
@@ -71,10 +73,25 @@ class Vanilla:
         if "javaVersion" not in version_data: raise BakeError(f"Mojang doesn't list a Java version for {mc_version}.")
 
         # capture the results
-        self.mc_version = version_data["id"]
-        self.jar_url = version_data["downloads"]["server"]["url"]
-        self.jar_sha1 = version_data["downloads"]["server"]["sha1"]
-        self.java_version = version_data["javaVersion"]["majorVersion"]
+        return cls(
+            mc_version = version_data["id"],
+            jar_url = version_data["downloads"]["server"]["url"],
+            jar_sha1 = version_data["downloads"]["server"]["sha1"],
+            java_version = version_data["javaVersion"]["majorVersion"]
+        )
+
+    def install_script(self) -> list[str]:
+        return [
+            "set -euo pipefail",
+            f"dnf install -y java-{self.java_version}-amazon-corretto-headless",
+            "mkdir -p /opt/minecraft",
+            "cd /opt/minecraft",
+            f"curl -fsSL -o server.jar {self.jar_url}",
+            f'echo "{self.jar_sha1}  server.jar" | sha1sum -c -',
+            'echo "eula=true" > eula.txt',
+            'dnf clean all'
+        ]
+
 
 
 

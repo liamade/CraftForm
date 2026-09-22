@@ -11,7 +11,8 @@ import time
 
 import discord
 from errors import BakeError
-import boto3, json
+import boto3, json, traceback
+from botocore.exceptions import WaiterError
 
 
 
@@ -51,7 +52,7 @@ def pick_recipe(server_type):
     if server_type not in RECIPES:
         raise ValueError(f"'{server_type}' isn't a server type I know how to bake :(")
 
-    return RECIPES[server_type]()
+    return RECIPES[server_type]
 
 # =====================================INSTANCE DETAILS=====================================
 # the two things that change per-bake -- newest arm64 al2023, and a subnet in an az that
@@ -139,17 +140,52 @@ def wait_for_ssm(ssm, instance_id, timeout=300):
 
     raise BakeError("The builder never checked in with SSM, so the bake can't start :(")
 
+
+def run_install(ssm, instance_id, commands):
+
+    command_id = ssm.send_command(
+        InstanceIds=[instance_id],
+        DocumentName="AWS-RunShellScript",
+        Parameters={
+            "commands": commands,
+        }
+    )["Command"]["CommandId"]
+
+    try:
+        ssm.get_waiter("command_executed").wait(
+            CommandId=command_id,
+            InstanceId=instance_id,
+            WaiterConfig={"Delay": 15, "MaxAttempts": 80},
+        )
+
+
+    except WaiterError:
+        pass
+
+    result = ssm.get_command_invocation(
+        InstanceId=instance_id,
+        CommandId=command_id,
+    )
+
+    print(f"install exit code: {result['ResponseCode']}")
+    print(result['StandardOutputContent'])
+    print(result['StandardErrorContent'])
+
+    if result['ResponseCode'] != 0:
+        raise BakeError(f"The build failed with {result['StandardOutputContent']} :(")
+
+
 # ===========================================MAIN===========================================
 # type-blind start to finish -- pick a recipe, resolve it, stand up a builder, bake on it
 # ------------------------------------------------------------------------------------------
 def main():
 
+    # bind the instance id just in case the build fails halfway through
+    instance_id = None
+
     try:
         # capture the server type used and get the class
-        recipe = pick_recipe(os.environ["SERVER_TYPE"])
-
-        # resolve the mc version and get the necessary info
-        recipe.resolve()
+        recipe = pick_recipe(os.environ["SERVER_TYPE"]).resolve()
 
         # both clients live in the DEPLOY region -- the agent checks in where the box lives,
         # so a home-region ssm client would never see the builder
@@ -170,6 +206,9 @@ def main():
         wait_for_ssm(ssm, instance_id)
 
         # send the boot script
+        run_install(ssm, instance_id, recipe.install_script())
+
+
 
 
 
@@ -180,9 +219,16 @@ def main():
         discord.followup(str(e))
         raise
 
+
     except Exception:
-        discord.followup(f"The bake for `{os.environ.get('SERVER_NAME', '?')}` fell over. :(")
+        discord.followup("The build failed :(")
+        traceback.print_exc()
         raise
+
+
+    finally:
+        if instance_id is not None:
+            print("do cleanup here")
 
 
 if __name__ == "__main__":
