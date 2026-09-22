@@ -11,7 +11,7 @@ import time
 
 import discord
 from errors import BakeError
-import boto3, json
+import boto3, json, traceback
 
 
 
@@ -51,7 +51,7 @@ def pick_recipe(server_type):
     if server_type not in RECIPES:
         raise ValueError(f"'{server_type}' isn't a server type I know how to bake :(")
 
-    return RECIPES[server_type]()
+    return RECIPES[server_type]
 
 # =====================================INSTANCE DETAILS=====================================
 # the two things that change per-bake -- newest arm64 al2023, and a subnet in an az that
@@ -144,12 +144,12 @@ def wait_for_ssm(ssm, instance_id, timeout=300):
 # ------------------------------------------------------------------------------------------
 def main():
 
+    # bind the instance id just in case the build fails halfway through
+    instance_id = None
+
     try:
         # capture the server type used and get the class
-        recipe = pick_recipe(os.environ["SERVER_TYPE"])
-
-        # resolve the mc version and get the necessary info
-        recipe.resolve()
+        recipe = pick_recipe(os.environ["SERVER_TYPE"]).resolve()
 
         # both clients live in the DEPLOY region -- the agent checks in where the box lives,
         # so a home-region ssm client would never see the builder
@@ -180,9 +180,16 @@ def main():
         discord.followup(str(e))
         raise
 
+
     except Exception:
-        discord.followup(f"The bake for `{os.environ.get('SERVER_NAME', '?')}` fell over. :(")
+        discord.followup("The build failed :(")
+        traceback.print_exc()
         raise
+
+
+    finally:
+        if instance_id is not None:
+            print("do cleanup here")
 
 
 if __name__ == "__main__":

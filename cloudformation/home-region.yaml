@@ -241,6 +241,7 @@ Resources:
                 Effect: Allow
                 Action:
                   - ec2:Describe*
+                  - ssm:DescribeInstanceInformation
                   - ssm:DescribeParameters
                 Resource: '*'
 
@@ -946,6 +947,37 @@ Resources:
       Artifacts:
         Type: NO_ARTIFACTS # no artifacts are produced by this build
 
+  CodeBuildServer:
+    Type: AWS::CodeBuild::Project
+    DependsOn:
+      - StageCodeTrigger
+    Properties:
+      Name: craftform-server
+      Description: CodeBuild project to bake Minecraft server AMIs for CraftForm.
+      Tags:
+        - Key: Project
+          Value: craftform
+        - Key: Environment
+          Value: HomeRegion
+      ServiceRole: !GetAtt CodeBuildServerRole.Arn
+
+      Environment:
+        Type: LINUX_CONTAINER
+        Image: aws/codebuild/standard:7.0
+        ComputeType: BUILD_GENERAL1_SMALL
+        EnvironmentVariables:
+          - Name: HOME_REGION
+            Value: !Ref AWS::Region
+      Source:
+        Type: S3
+        Location: !Sub ${CraftFormHomeBucket}/lambda-code/server.zip
+        BuildSpec: buildspec.yaml
+      ConcurrentBuildLimit: 5
+      TimeoutInMinutes: 30
+      QueuedTimeoutInMinutes: 15
+      Artifacts:
+        Type: NO_ARTIFACTS
+
   # -----------------------------------------LAMBDA FUNCTIONS------------------------------------------
   # STAGING LAMBDA FUNCTION - used to stage the code for the other lambda function in S3 before deployment.
   StagingFunction:
@@ -976,7 +1008,7 @@ Resources:
 
           # the release assets we stage -- the two lambda zips, plus the terraform source
           # that the codebuild project pulls down at the start of every region run
-          assets = ['startup.zip', 'operations.zip', 'terraform.zip']
+          assets = ['startup.zip', 'operations.zip', 'terraform.zip', 'server.zip']
           base = "https://github.com/Liamade/CraftForm/releases"
 
           # ================CODE STAGING FUNCTION================
