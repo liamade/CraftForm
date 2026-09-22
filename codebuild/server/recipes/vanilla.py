@@ -80,6 +80,17 @@ class Vanilla:
             java_version = version_data["javaVersion"]["majorVersion"]
         )
 
+    def install_script(self) -> list[str]:
+        return [
+            "set -euo pipefail",
+            f"dnf install -y java-{self.java_version}-amazon-corretto-headless",
+            "mkdir -p /opt/minecraft",
+            "cd /opt/minecraft",
+            f"curl -fsSL -o server.jar {self.jar_url}",
+            f'echo "{self.jar_sha1}  server.jar" | sha1sum -c -',
+            'echo "eula=true" > eula.txt',
+            'dnf clean all'
+        ]
 
 
 

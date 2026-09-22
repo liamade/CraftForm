@@ -12,6 +12,7 @@ import time
 import discord
 from errors import BakeError
 import boto3, json, traceback
+from botocore.exceptions import WaiterError
 
 
 
@@ -139,6 +140,41 @@ def wait_for_ssm(ssm, instance_id, timeout=300):
 
     raise BakeError("The builder never checked in with SSM, so the bake can't start :(")
 
+
+def run_install(ssm, instance_id, commands):
+
+    command_id = ssm.send_command(
+        InstanceIds=[instance_id],
+        DocumentName="AWS-RunShellScript",
+        Parameters={
+            "commands": commands,
+        }
+    )["Command"]["CommandId"]
+
+    try:
+        ssm.get_waiter("command_executed").wait(
+            CommandId=command_id,
+            InstanceId=instance_id,
+            WaiterConfig={"Delay": 15, "MaxAttempts": 80},
+        )
+
+
+    except WaiterError:
+        pass
+
+    result = ssm.get_command_invocation(
+        InstanceId=instance_id,
+        CommandId=command_id,
+    )
+
+    print(f"install exit code: {result['ResponseCode']}")
+    print(result['StandardOutputContent'])
+    print(result['StandardErrorContent'])
+
+    if result['ResponseCode'] != 0:
+        raise BakeError(f"The build failed with {result['StandardOutputContent']} :(")
+
+
 # ===========================================MAIN===========================================
 # type-blind start to finish -- pick a recipe, resolve it, stand up a builder, bake on it
 # ------------------------------------------------------------------------------------------
@@ -170,6 +206,9 @@ def main():
         wait_for_ssm(ssm, instance_id)
 
         # send the boot script
+        run_install(ssm, instance_id, recipe.install_script())
+
+
 
 
 
