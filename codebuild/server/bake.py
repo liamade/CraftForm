@@ -6,15 +6,15 @@
 # ║  Each type is a class with the same methods, so main stays type-blind.       ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
+import json
 import os
 import time
+import traceback
 
+import boto3
 import discord
-from errors import BakeError
-import boto3, json, traceback
 from botocore.exceptions import WaiterError
-
-
+from errors import BakeError
 
 # ==========================================================================================
 #                                   THE RECIPE REGISTRY
@@ -174,6 +174,21 @@ def run_install(ssm, instance_id, commands):
     if result['ResponseCode'] != 0:
         raise BakeError(f"The build failed with {result['StandardOutputContent']} :(")
 
+def build_template(ec2, instance_id, image_name) -> str:
+    response = ec2.create_image(
+        InstanceId=instance_id,
+        Name=image_name,
+        TagSpecifications=[
+            {"ResourceType": "image", "Tags": [
+                {"Key": "Project", "Value": "craftform"}
+            ]},
+            {"ResourceType": "snapshot", "Tags": [
+                {"Key": "Project", "Value": "craftform"}
+            ]}
+        ]
+    )
+
+    return response['ImageId']
 
 # ===========================================MAIN===========================================
 # type-blind start to finish -- pick a recipe, resolve it, stand up a builder, bake on it
@@ -208,11 +223,14 @@ def main():
         # send the boot script
         run_install(ssm, instance_id, recipe.install_script())
 
+        # create an ami template with the name
+        image_id = build_template(ec2, instance_id, recipe.image_name())
 
-
-
-
-
+        # wait for the instance ID to be complete
+        ec2.get_waiter("image_available").wait(
+            ImageIds=[image_id],
+            WaiterConfig={"Delay": 15, "MaxAttempts": 40},
+        )
 
 
     except BakeError as e:

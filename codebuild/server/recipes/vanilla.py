@@ -1,10 +1,10 @@
 
 
 
-import os, urllib3
+import os
 
+import urllib3
 from errors import BakeError
-
 
 
 class Vanilla:
@@ -93,7 +93,8 @@ class Vanilla:
         ]
 
 
-
+    def image_name(self) -> str:
+        return f"craftform-vanilla-{self.mc_version}"
 
 
 
