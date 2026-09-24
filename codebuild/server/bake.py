@@ -209,33 +209,45 @@ def main():
         # capture the server type used and get the class
         recipe = pick_recipe(os.environ["SERVER_TYPE"]).resolve()
 
-        config = json.loads(os.environ["REGION_CONFIG"])
+        # check and make sure there isn't template already cached
+        image_id = recipe.cache_check(ec2)
 
-        # get the deployment details for the instance
-        base_image, subnet = instance_details(ec2, config)
+        if image_id is None:
 
-        # launch the ec2
-        instance_id = start_instance(ec2, config, base_image, subnet)
+            config = json.loads(os.environ["REGION_CONFIG"])
 
-        # wait for the hardware to come up -- blocks until it's running or raises WaiterError
-        ec2.get_waiter("instance_running").wait(InstanceIds=[instance_id])
+            # get the deployment details for the instance
+            base_image, subnet = instance_details(ec2, config)
 
-        # then wait for the agent inside it to actually check in with ssm
-        wait_for_ssm(ssm, instance_id)
+            # launch the ec2
+            instance_id = start_instance(ec2, config, base_image, subnet)
 
-        # send the boot script
-        run_install(ssm, instance_id, recipe.install_script())
+            # wait for the hardware to come up -- blocks until it's running or raises WaiterError
+            ec2.get_waiter("instance_running").wait(InstanceIds=[instance_id])
 
-        # create an ami template with the name
-        image_id = build_template(ec2, instance_id, recipe.image_name())
+            # then wait for the agent inside it to actually check in with ssm
+            wait_for_ssm(ssm, instance_id)
 
-        # wait for the instance ID to be complete
-        ec2.get_waiter("image_available").wait(
-            ImageIds=[image_id],
-            WaiterConfig={"Delay": 15, "MaxAttempts": 40},
-        )
+            # send the boot script
+            run_install(ssm, instance_id, recipe.install_script())
+
+            # create an ami template with the name
+            image_id = build_template(ec2, instance_id, recipe.image_name())
+
+            # wait for the instance ID to be complete
+            ec2.get_waiter("image_available").wait(
+                ImageIds=[image_id],
+                WaiterConfig={"Delay": 15, "MaxAttempts": 40},
+            )
+
+
         # flag to make sure it finished
         image_finished = True
+
+
+        # get the details of the image and set a record in ssm/dynamo for it
+
+        # write success
 
         # put the records into ssm/dynamodb
 

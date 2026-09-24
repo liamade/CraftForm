@@ -80,6 +80,23 @@ class Vanilla:
             java_version = version_data["javaVersion"]["majorVersion"]
         )
 
+    def cache_check(self, ec2) -> str | None:
+        images = ec2.describe_images(
+            Owners=["self"],
+            Filters=[
+                {"Name": "name", "Values": [self.image_name()]},
+                {"Name": "state", "Values": ["available"]},
+            ]
+        )["Images"]
+
+        if images:
+            return images[0]['ImageId']
+        else:
+            return None
+
+
+
+
     def install_script(self) -> list[str]:
         return [
             "set -euo pipefail",
