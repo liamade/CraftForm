@@ -195,17 +195,20 @@ def build_template(ec2, instance_id, image_name) -> str:
 # ------------------------------------------------------------------------------------------
 def main():
 
-    # bind the instance id just in case the build fails halfway through
+    # "flags" to check and see if the build succeeded
     instance_id = None
+    image_id = None
+    image_finished = False
+
+    # both clients live in the DEPLOY region -- the agent checks in where the box lives,
+    # so a home-region ssm client would never see the builder
+    ec2 = boto3.client("ec2", region_name=os.environ["DEPLOY_REGION"])
+    ssm = boto3.client("ssm", region_name=os.environ["DEPLOY_REGION"])
 
     try:
         # capture the server type used and get the class
         recipe = pick_recipe(os.environ["SERVER_TYPE"]).resolve()
 
-        # both clients live in the DEPLOY region -- the agent checks in where the box lives,
-        # so a home-region ssm client would never see the builder
-        ec2 = boto3.client("ec2", region_name=os.environ["DEPLOY_REGION"])
-        ssm = boto3.client("ssm", region_name=os.environ["DEPLOY_REGION"])
         config = json.loads(os.environ["REGION_CONFIG"])
 
         # get the deployment details for the instance
@@ -231,6 +234,10 @@ def main():
             ImageIds=[image_id],
             WaiterConfig={"Delay": 15, "MaxAttempts": 40},
         )
+        # flag to make sure it finished
+        image_finished = True
+
+        # put the records into ssm/dynamodb
 
 
     except BakeError as e:
@@ -246,7 +253,16 @@ def main():
 
     finally:
         if instance_id is not None:
-            print("do cleanup here")
+            ec2.terminate_instances(
+                InstanceIds = [instance_id]
+            )
+
+        if image_id and not image_finished:
+            ec2.deregister_image(
+                ImageId = image_id,
+                DeleteAssociatedSnapshots = True
+            )
+
 
 
 if __name__ == "__main__":
