@@ -39,6 +39,7 @@ def handler(event, context):
     if not verify_signature(event, raw_body, discord_public_key):
         print("Signature verification FAILED :(")
         return {
+            "headers": {"Content-Type": "application/json"},
             "statusCode": 401,
             "body": json.dumps({"error": "Invalid request signature"}),
         }
