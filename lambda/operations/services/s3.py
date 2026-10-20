@@ -17,6 +17,6 @@ from aws_clients import s3  # shared client -- made once per cold start
 # =================================BUCKET HAS OBJECTS====================================
 # cheapest possible "is this bucket empty?" check -- ask for just a SINGLE key. if even one
 # comes back, there's data in there. we don't list the whole bucket, we just peek :)
-def bucket_has_objects(bucket):
+def bucket_has_objects(bucket: str) -> bool:
     response = s3.list_objects_v2(Bucket=bucket, MaxKeys=1)
     return response.get("KeyCount", 0) > 0

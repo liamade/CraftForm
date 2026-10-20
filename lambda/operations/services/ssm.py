@@ -13,13 +13,15 @@
 # minimize the code in other files
 # ------------------------------------------------------------------------------------------
 import json
+from collections.abc import Mapping
+from typing import Any
 
 from aws_clients import ssm  # shared client -- made once per cold start
 
 
 # ===============================LIST NAMES UNDER A PREFIX===============================
 # pull the resource names sitting directly under a prefix.
-def list_names_under(prefix):
+def list_names_under(prefix: str) -> list[str]:
 
     # make sure we've got the trailing slash so the strip + split below lines up
     if not prefix.endswith("/"):
@@ -40,12 +42,12 @@ def list_names_under(prefix):
 
 
 # =====================================GET A VARIABLE====================================
-def get_parameter(name):
+def get_parameter(name: str) -> str:
     return ssm.get_parameter(Name=name)["Parameter"]["Value"]
 
 
 # ====================================GET A JSON DICT====================================
-def get_dict(name):
+def get_dict(name: str) -> dict[str, Any]:
     # turns string blobs in the ssm parameter store into a json dictionary
     return json.loads(ssm.get_parameter(Name=name)["Parameter"]["Value"])
 
@@ -56,7 +58,7 @@ def get_dict(name):
 #   security_group    the minecraft SG (25565 open)
 #   instance_profile  the role the ec2 servers assume
 #   subnet_ids        {az: subnet_id} -- pick one to launch into
-def region_config(region):
+def region_config(region: str) -> dict[str, Any]:
     return get_dict(f"/craftform/regions/{region}/config")
 
 
@@ -64,7 +66,7 @@ def region_config(region):
 # overwrite=False is the CREATE guard -- ssm rejects a name that's already taken, and it's
 # atomic, so no check-then-write race. returns True if it wrote, False if the name was
 # taken. we swallow the exception because callers import this MODULE, not the raw client :)
-def put_dict(name, data, overwrite=True):
+def put_dict(name: str, data: Mapping[str, object], overwrite: bool = True) -> bool:
     try:
         ssm.put_parameter(
             Name=name,
@@ -79,8 +81,13 @@ def put_dict(name, data, overwrite=True):
 
 
 # ====================================DELETE A PARAMETER=================================
-def delete_parameter(name):
-    ssm.delete_parameter(Name=name)
+def delete_parameter(name: str) -> bool:
+    try:
+        ssm.delete_parameter(Name=name)
+        return True
+
+    except ssm.exceptions.ParameterNotFound:
+        return False
 
 
 # ============================GET THE DISCORD PUBLIC KEY (cached)============================
@@ -90,7 +97,7 @@ def delete_parameter(name):
 _discord_public_key = None  # starts empty -- nothing fetched yet
 
 
-def get_discord_public_key():
+def get_discord_public_key() -> str:
     global _discord_public_key  # we wanna update the cache var above, not make a new local one
 
     if _discord_public_key is None:  # first call on this container? go grab it + save it

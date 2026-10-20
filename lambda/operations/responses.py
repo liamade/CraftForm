@@ -18,15 +18,17 @@ from typing import Any, TypedDict
 # discord flag that marks a reply as ephemeral -- only the user who ran the command sees it
 EPHEMERAL = 64
 
+
 class ApiResponse(TypedDict):
     statusCode: int
     headers: dict[str, str]
     body: str
 
+
 # =================================API GATEWAY ENVELOPE==================================
 # private -- wrap a discord interaction payload in the api gateway response shape.
 # everything below funnels through here so the envelope lives in exactly one place
-def _respond(payload: Any) -> ApiResponse:
+def _respond(payload: dict[str, Any]) -> ApiResponse:
     return {
         "statusCode": 200,
         "headers": {"Content-Type": "application/json"},
@@ -63,7 +65,7 @@ def plain_message(text: str) -> ApiResponse:
 # =====================================DROP DOWN========================================
 # type 4 with a string select menu. `options` is a ready-made list of
 # {"label": ..., "value": ...} dicts -- the CALLER builds those so we stay domain-agnostic
-def drop_down(content: str, custom_id: str, placeholder: str, options: list) -> ApiResponse:
+def drop_down(content: str, custom_id: str, placeholder: str, options: list[dict[str, str]]) -> ApiResponse:
     # fmt: off
     return _respond({
         "type": 4,
@@ -94,7 +96,7 @@ def drop_down(content: str, custom_id: str, placeholder: str, options: list) -> 
 #
 # two discord rules, both silent failures if you break them: a modal must be an IMMEDIATE
 # response (no deferring first), and it's FIVE fields max, one per action row
-def modal(custom_id: str, title: str, fields: list) -> ApiResponse:
+def modal(custom_id: str, title: str, fields: list[dict[str, Any]]) -> ApiResponse:
     # fmt: off
     return _respond({
         "type": 9,
@@ -125,7 +127,7 @@ def modal(custom_id: str, title: str, fields: list) -> ApiResponse:
 # ====================================AUTOCOMPLETE======================================
 # type 8 = the suggestion list shown while someone's still typing an option. `choices` is
 # a list of {"name": shown, "value": sent}. 25 MAX -- more and discord rejects the lot
-def autocomplete(choices: list) -> ApiResponse:
+def autocomplete(choices: list[dict[str, str]]) -> ApiResponse:
     # fmt: off
     return _respond({
         "type": 8,
@@ -137,5 +139,5 @@ def autocomplete(choices: list) -> ApiResponse:
 # ==================================READ MODAL FIELDS===================================
 # flatten a modal submit to {custom_id: value}. values sit one layer deeper than
 # component interactions -- each input is wrapped in its own action row
-def modal_values(body) -> dict[str, str]:
+def modal_values(body: dict[str, Any]) -> dict[str, str]:
     return {row["components"][0]["custom_id"]: row["components"][0]["value"] for row in body["data"]["components"]}
