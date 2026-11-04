@@ -201,10 +201,18 @@
               # so drop it and let each tool use its own :)
               unset PYTHONPATH
 
+              # point uv at the repo root no matter where you run it. without this,
+              # `uv sync` from inside lambda/operations strips .venv down to JUST that
+              # package -- no ruff, no mypy. (adding a dep to one package is now
+              # `uv add --package craftform-operations <dep>`)
+              export UV_PROJECT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+
               echo ""
               echo "  CraftForm  ::  dev shell"
               echo "  ---------------------------------------------"
               echo "  ci    run every check ci-all.yaml runs"
+              echo ""
+              echo "  no direnv? run: uv sync && source .venv/bin/activate"
               echo ""
             '';
           };

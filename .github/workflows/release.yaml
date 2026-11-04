@@ -76,7 +76,10 @@ jobs:
             # --locked breaks the release if the lock is stale. lands in RUNNER_TEMP so it stays out of the zip
             uv export --package craftform-$function --no-dev --locked --no-emit-workspace \
               -o "$RUNNER_TEMP/$function-requirements.txt"
-            uv pip install -r "$RUNNER_TEMP/$function-requirements.txt" --target lambda-build/$function
+            # --python-platform: grab the builds that run on LAMBDA's linux (glibc 2.34), not whatever
+            # suits this runner -- a newer runner could otherwise pull a pynacl that lambda can't load
+            uv pip install -r "$RUNNER_TEMP/$function-requirements.txt" --target lambda-build/$function \
+              --python-platform x86_64-manylinux_2_34 --python-version 3.12
 
             # COPY DIRECTORY -- copy everthing except certain files
             rsync -a \
