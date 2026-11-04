@@ -20,5 +20,5 @@
 ruff==0.16.9                                                   # pkgs.ruff
 mypy==2.4.1                                                    # ps.mypy
 bandit==1.9.4                                                  # ps.bandit
-pytest==9.1.1                                                  # ps.pytest
+pytest==9.2.0                                                  # ps.pytest
 boto3-stubs[essential,ssm]==1.43.114                           # ps.boto3-stubs -- [essential] has ec2, ssm is extra
