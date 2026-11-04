@@ -57,10 +57,11 @@ jobs:
       - name: Checkout Repository 
         uses: actions/checkout@v7
 
-      # PYTHON SETUP: set up python 3.12 for building the lambda code
-      - name: Set up Python 
-        uses: actions/setup-python@v7
+      # UV + PYTHON SETUP: python 3.12 for building the lambda code, uv to pull its deps out of uv.lock
+      - name: Set up uv + Python
+        uses: astral-sh/setup-uv@v10.3.3
         with:
+          version: '0.12.5'       # pkgs.uv -- see the note in lambda-ci.yaml
           python-version: '3.12'
 
 
@@ -69,18 +70,20 @@ jobs:
         run: |
           # BUILD OUT THE LAMBDA CODE
           for function in startup operations; do
-            
 
-            # DEPENDENCIES -- install required dependencies from the requirements.txt
-            pip install -r lambda/$function/requirements.txt -t lambda-build/$function 
-            
-            # COPY DIRECTORY -- copy everthing except certain files 
+
+            # DEPENDENCIES -- pull this lambda's runtime deps out of uv.lock and install them.
+            # --locked breaks the release if the lock is stale. lands in RUNNER_TEMP so it stays out of the zip
+            uv export --package craftform-$function --no-dev --locked --no-emit-workspace \
+              -o "$RUNNER_TEMP/$function-requirements.txt"
+            uv pip install -r "$RUNNER_TEMP/$function-requirements.txt" --target lambda-build/$function
+
+            # COPY DIRECTORY -- copy everthing except certain files
             rsync -a \
               --exclude='__pycache__' \
               --exclude='*.pyc' \
               --exclude='.mypy_cache' \
-              --exclude='requirements*.txt' \
-              --exclude='requirements-dev.txt' \
+              --exclude='pyproject.toml' \
               lambda/$function/ lambda-build/$function/
 
             # ZIP FILES -- zip files to make an actual release

@@ -44,15 +44,20 @@ jobs:
       - name: Checkout Repo
         uses: actions/checkout@v7
 
-      - name: Setup Python
-        uses: actions/setup-python@v7
+      # PINNED to the flake's uv so laptop and ci read the lock the same. bump with nixpkgs
+      - name: Setup uv + Python
+        uses: astral-sh/setup-uv@v10.3.3
         with:
-          python-version: "3.12"
-      
-      # install everything needed for the ci from the requirements-dev.txt
+          version: "0.12.5"       # pkgs.uv
+          python-version: "3.12"  # uv finds or downloads it
+
+      # install from uv.lock. --locked FAILS if the lock is stale instead of quietly fixing it.
+      # then put .venv/bin on PATH
       - name: Install Dependencies
+        working-directory: ${{ github.workspace }}   # repo root, where .venv lives
         run: |
-          pip install -r requirements-dev.txt   
+          uv sync --locked
+          echo "$GITHUB_WORKSPACE/.venv/bin" >> "$GITHUB_PATH"
 
       # checks formatting using ruff in read-only mode. fails if ruff would change anything
       - name: Check Formatting

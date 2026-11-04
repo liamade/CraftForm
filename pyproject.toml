@@ -1,7 +1,38 @@
 # ==========================================================================================
+#                                  UV WORKSPACE
+# ==========================================================================================
+# ties the three python packages into ONE uv.lock. each package lists its own runtime
+# deps, the dev tools live once down below. uv.lock has the exact version of everything
+[tool.uv.workspace]
+members = [
+  "lambda/operations",    # craftform-operations -- the discord interactions lambda
+  "lambda/startup",       # craftform-startup    -- the cloudformation custom resource
+  "codebuild/server",     # craftform-server-bake -- the AMI bake codebuild runs
+]
+
+# ------------------------------------------------------------------------------------------
+# DEV TOOLS
+# ------------------------------------------------------------------------------------------
+# floors -- uv.lock has the exact versions, dependabot bumps it.
+# boto3 lives HERE, not in the lambdas -- lambda already ships it, so zipping it is just bloat
+[dependency-groups]
+dev = [
+  "ruff>=0.16.9",       # format + lint
+  "mypy>=2.4.0",        # type check
+  "bandit>=1.9.4",      # python security scan
+  "pytest>=9.1.1",      # the test runner
+  "cfn-lint>=1.43.3",   # the ci gate on cloudformation/*.yaml
+  "boto3>=1.42",        # the lambdas' runtime-provided boto3, for local tests
+
+  # every extra any package needs -- [essential] is s3/ec2/lambda
+  "boto3-stubs[essential,ssm,secretsmanager,codebuild]>=1.43.114",
+]
+
+
+# ==========================================================================================
 #                              RUFF CONFIGURATION
 # ==========================================================================================
-# the ONE ruff config for the repo. both lambdas inherit it -- ruff walks up from
+# the ONE ruff config for the repo. every package inherits it -- ruff walks up from
 # whatever directory it's invoked in, so `cd lambda/operations && ruff check .`
 # (what ci and the lambda-ci workflow both do) lands here.
 
@@ -13,8 +44,8 @@ line-length = 160   # change the threshold of characters per line
 # ------------------------------------------------------------------------------------------
 # `select` is deliberately LEFT AT THE DEFAULT. ruff's default set has grown over
 # time (0.16 lints a good deal more than the old E4/E7/E9/F), so what pins our
-# behaviour is the ruff VERSION pinned in lambda/*/requirements-dev.txt to match
-# the flake -- not a hand-maintained list here that'd rot on its own.
+# behaviour is the ruff VERSION pinned in uv.lock -- not a hand-maintained list
+# here that'd rot on its own.
 [tool.ruff.lint]
 
 # placeholder: pep8-naming on top of the default set

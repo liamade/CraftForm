@@ -1,0 +1,23 @@
+# ╔══════════════════════════════════════════════════════════════════════════════╗
+# ║                               CraftForm                                      ║
+# ╠══════════════════════════════════════════════════════════════════════════════╣
+# ║  CODEBUILD  ::  pyproject.toml                                               ║
+# ║  What the AMI bake needs at RUNTIME inside codebuild.                        ║
+# ║  Dev tools live in the root one.                                             ║
+# ╚══════════════════════════════════════════════════════════════════════════════╝
+
+# how this connects to the root -- see the note in lambda/operations/pyproject.toml
+
+[project]
+name = "craftform-server-bake"
+version = "0.0.0"               # unused -- git tags version the releases
+requires-python = "==3.12.*"    # buildspec.yaml's `python: 3.12`, exactly
+
+# floors, uv.lock pins them. boto3 IS here -- codebuild doesn't promise one
+# (the stubs are dev-only, which is why bake.py hides them behind TYPE_CHECKING)
+dependencies = [
+  "boto3>=1.42",      # ec2 + ssm
+  "urllib3>=2",       # the discord followup webhook
+]
+
+# no [build-system] on purpose -- same as the lambdas, see the note in operations

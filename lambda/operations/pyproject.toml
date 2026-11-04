@@ -1,0 +1,24 @@
+# ╔══════════════════════════════════════════════════════════════════════════════╗
+# ║                               CraftForm                                      ║
+# ╠══════════════════════════════════════════════════════════════════════════════╣
+# ║  OPERATIONS LAMBDA  ::  pyproject.toml                                       ║
+# ║  What this lambda needs at RUNTIME -- the stuff that ships in the zip.       ║
+# ║  Dev tools live in the root one.                                             ║
+# ╚══════════════════════════════════════════════════════════════════════════════╝
+
+# the root pyproject lists this folder as a workspace member -- this file doesn't point
+# back. there's no inheriting in pyproject, so name/version/python have to live here
+
+[project]
+name = "craftform-operations"
+version = "0.0.0"               # unused -- git tags version the releases
+requires-python = "==3.12.*"    # the lambda runtime, exactly
+
+# floors, uv.lock pins them. NO boto3 on purpose -- lambda ships its own
+dependencies = [
+  "pynacl>=1.6.2",    # verifies the ed25519 signature discord signs every interaction with
+  "urllib3>=2",       # the discord http calls
+]
+
+# no [build-system] on purpose -- this is just a folder that gets zipped, so uv
+# installs the deps and never tries to build it

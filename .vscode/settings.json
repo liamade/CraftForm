@@ -22,6 +22,9 @@
         "editor.formatOnSave": false
     },
 
+    // the uv venv -- so pylance finds it even without the direnv extension
+    "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
+
     "azureTerraform.checkTerraformCmd": false,
     "yaml.customTags": [
         "!And sequence",

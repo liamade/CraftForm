@@ -13,8 +13,7 @@
   description = "CraftForm -- discord-driven minecraft server infrastructure";
 
   inputs = {
-    # unstable on purpose -- ruff/cfn-lint/checkov move fast, and the stable channel
-    # lags far enough behind to start disagreeing with what CI pip-installs
+    # unstable on purpose -- checkov/terraform move fast and stable lags behind
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
   };
 
@@ -46,59 +45,30 @@
           permittedInsecurePackages = [ "python3.14-ecdsa-0.19.2" ];
         };
       }));
-
-      # ====================================================================
-      #                              PYTHON
-      # ====================================================================
-      # mirrors lambda/*/requirements-dev.txt with cfn-lint bolted on. ONE
-      # interpreter for the whole repo, so mypy sees exactly the stubs the
-      # rest of the tooling does.
-      #
-      # lives up HERE rather than inside the devShell's let so `packages.python`
-      # can hand an editor the exact same derivation the shell uses -- an ide
-      # pointed at a different interpreter is an ide that disagrees with ci
-      pythonFor = pkgs: pkgs.python312.withPackages (ps: [
-        ps.cfn-lint     # the ci gate on cloudformation/*.yaml
-        ps.mypy         # type check
-        ps.bandit       # python security scan
-        ps.pynacl       # operations lambda -- verifies discord's ed25519 sigs
-        ps.urllib3      # both lambdas -- the discord + cloudformation http calls
-        ps.boto3-stubs  # what lets mypy understand the boto3 client calls
-        ps.pytest       # PLACEHOLDER COMMENT -- the test runner
-      ] ++ (with ps.boto3-stubs.optional-dependencies;
-              # PLACEHOLDER COMMENT -- [essential] covers s3/ec2/lambda but not these three
-              essential ++ ssm ++ secretsmanager ++ codebuild));
     in
     {
       # ======================================================================
-      #                          THE EDITOR INTERPRETER
+      #                          THE EDITOR TOOLS
       # ======================================================================
-      # `nix build .#python -o .python-env` drops a stable symlink at the repo
-      # root pointing at the interpreter below.
-      #
-      # vscode doesn't need this -- the direnv extension puts the dev shell on
-      # PATH and pylance follows. pycharm has no direnv, so its sdk has to be an
-      # absolute path. aim it at .python-env/bin/python3.12 ONCE and a flake.lock
-      # bump just moves the symlink underneath it, instead of leaving the ide
-      # quietly pinned to a stale /nix/store path that nothing else uses :)
-      #
-      # .python-env is gitignored -- it's a nix gc root, same as .direnv
+      # pycharm has no direnv -- point its python at .venv/bin/python, uv keeps that path fresh
       packages = forAllSystems (pkgs: {
-        python = pythonFor pkgs;
 
-        # PLACEHOLDER COMMENT -- same trick as .python-env, for the tools pycharm
-        # pins by absolute path. `nix build .#dev-tools -o .dev-env` once, then the
-        # ide points at .dev-env/bin/<tool> and a flake.lock bump just moves it
+        # `nix build .#dev-tools -o .dev-env` once, then the ide points at
+        # .dev-env/bin/<tool> and a flake.lock bump just moves the symlink
+        # underneath it
         dev-tools = pkgs.symlinkJoin {
           name = "craftform-dev-tools";
-          paths = [ pkgs.ruff pkgs.terraform ];
+          paths = [ pkgs.terraform ];
         };
       });
 
       devShells = forAllSystems (pkgs:
         let
-          # the one from up top -- see the note next to pythonFor
-          python = pythonFor pkgs;
+          # ====================================================================
+          #                              PYTHON
+          # ====================================================================
+          # BARE 3.12 -- no packages, uv.lock picks those. matches the lambda + codebuild runtimes
+          python = pkgs.python312;
 
           # ====================================================================
           #                            THE CI RUNNER
@@ -112,6 +82,11 @@
 
             ROOT="$(git rev-parse --show-toplevel)" || exit 1
             FAILED=()
+
+            # sync the venv like ci does (--locked = fail if uv.lock is stale) and add it
+            # to PATH ourselves -- `nix develop -c ci` skips direnv
+            ( cd "$ROOT" && uv sync --locked --quiet ) || exit 1
+            PATH="$ROOT/.venv/bin:$PATH"
 
             step() {
               # grab the label BEFORE the shift -- after it, $1 is the command
@@ -190,7 +165,9 @@
               pkgs.checkov    # configured by .checkov.yaml
 
               # ================= PYTHON TOOLING ==============
-              pkgs.ruff       # format + lint. the standalone binary, same as pip's
+              # uv is the ONLY python tool from nix -- everything else comes from uv.lock.
+              # the ci workflows pin setup-uv to this version, so move those with it
+              pkgs.uv         # 0.12.5 as of this flake.lock
 
               # ================ EDITOR SUPPORT ===============
               # the vscode Nix IDE extension shells out to these -- it does syntax
@@ -209,9 +186,9 @@
               pkgs.unzip
             ];
 
-            # mypy writes .mypy_cache wherever it runs -- already gitignored, but this
-            # keeps the two lambda dirs from fighting over one cache
-            MYPY_CACHE_DIR = ".mypy_cache";
+            # use the flake's 3.12, never let uv download its own
+            UV_PYTHON = "${python}/bin/python3.12";
+            UV_PYTHON_DOWNLOADS = "never";
 
             shellHook = ''
               # checkov and awscli2 are built against python 3.14, and mkShell helpfully
@@ -220,8 +197,8 @@
               # importing a C extension built for the wrong ABI.
               #
               # nothing here actually wants PYTHONPATH: checkov/aws are wrapped binaries
-              # that set their own, and python312.withPackages puts our packages on the
-              # interpreter's real sys.path. so drop it and let each tool use its own :)
+              # that set their own, and our packages live in .venv's own site-packages.
+              # so drop it and let each tool use its own :)
               unset PYTHONPATH
 
               echo ""

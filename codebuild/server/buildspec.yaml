@@ -49,7 +49,7 @@ phases:
     runtime-versions:
       python: 3.12
     commands:
-      - pip install -r requirements.txt
+      - pip install -r requirements.txt   # NOT in git -- gets exported from uv.lock when server.zip is built
 
  # ----------------------------------------------------------
  #                        THE BAKE

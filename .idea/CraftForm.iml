@@ -5,17 +5,14 @@
       <sourceFolder url="file://$MODULE_DIR$/lambda/operations" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/lambda/startup" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/codebuild/server" isTestSource="false" />
-      <sourceFolder url="file://$MODULE_DIR$/.python-env/lib/python3.12" isTestSource="false" />
-      <sourceFolder url="file://$MODULE_DIR$/.python-env/lib/python3.12/lib-dynload" isTestSource="false" />
-      <sourceFolder url="file://$MODULE_DIR$/.python-env/lib/python3.12/site-packages" isTestSource="false" />
-      <excludeFolder url="file://$MODULE_DIR$/.python-env" />
+      <excludeFolder url="file://$MODULE_DIR$/.venv" />
       <excludeFolder url="file://$MODULE_DIR$/.direnv" />
       <excludeFolder url="file://$MODULE_DIR$/.ruff_cache" />
       <excludeFolder url="file://$MODULE_DIR$/.mypy_cache" />
       <excludeFolder url="file://$MODULE_DIR$/terraform/.terraform" />
       <excludeFolder url="file://$MODULE_DIR$/terraform/modules/region/.terraform" />
     </content>
-    <orderEntry type="jdk" jdkName="CraftForm flake (Python 3.12)" jdkType="Python SDK" />
+    <orderEntry type="jdk" jdkName="CraftForm (Python 3.12)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
   </component>
   <component name="PyDocumentationSettings">
