@@ -12,6 +12,7 @@
 # ==========================================================================================
 import json
 from pathlib import Path
+from typing import Any
 
 import urllib3
 
@@ -20,7 +21,7 @@ import urllib3
 #                                    DISCORD CLASS
 # ==========================================================================================
 class DiscordClient:
-    def __init__(self, bot_token, app_id):
+    def __init__(self, bot_token: str, app_id: str) -> None:
         # discord bot token
         self.bot_token = bot_token
         # discord app id
@@ -37,15 +38,16 @@ class DiscordClient:
 
     # private method to handle all http requests
     # path defaults to "" for endpoints that hit the application root (e.g. setting the interactions url)
-    def _request(self, method, path="", body=None):
+    # body is anything json-shaped -- an object for the PATCH, a list of commands for the PUT
+    def _request(self, method: str, path: str = "", body: dict[str, Any] | list[Any] | None = None) -> urllib3.BaseHTTPResponse:
         return self.http.request(
             method,
             f"https://discord.com/api/v10/applications/{self.app_id}{path}",
-            headers={**self.headers, "Content-Type": "application/json"},
+            headers=self.headers,
             body=json.dumps(body) if body is not None else None,
         )
 
-    def send_api_url(self, api_url):
+    def send_api_url(self, api_url: str) -> None:
 
         # send a post to discord API to set the interactions endpoint to the API Gateway URL
         # no path -> PATCH the application object itself at applications/{app_id}
@@ -58,12 +60,11 @@ class DiscordClient:
 
         # make sure the request was successful
         if response.status != 200:
-            raise RuntimeError(f"Failed to set Discord interactions endpoint: {response.status} - {response.data} :(")
+            raise RuntimeError(f"Failed to set Discord interactions endpoint: {response.status} - {response.data.decode()} :(")
 
-        else:
-            print("API Gateaway URL set on Discord application :)")
+        print("API Gateway URL set on Discord application :)")
 
-    def register_commands(self):
+    def register_commands(self) -> None:
 
         # register the slash commands with the Discord API
         response = self._request(
@@ -73,6 +74,6 @@ class DiscordClient:
         )
 
         if response.status != 200:
-            raise RuntimeError(f"Failed to register slash commands: {response.status} - {response.data} :(")
-        else:
-            print("Slash commands registered with Discord :)")
+            raise RuntimeError(f"Failed to register slash commands: {response.status} - {response.data.decode()} :(")
+
+        print("Slash commands registered with Discord :)")

@@ -20,6 +20,12 @@ updates:
     schedule:
       interval: 'weekly'
 
+  # scan the requirements.txt and dependencies for vulnerabilities or updates
+  - package-ecosystem: 'pip'
+    directory: '/codebuild/server'
+    schedule:
+      interval: 'weekly'
+
   # check the versions of github actions and workflows
   - package-ecosystem: 'github-actions'
     directory: '/'

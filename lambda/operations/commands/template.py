@@ -5,12 +5,15 @@
 # ║  Handles all /template slash command interactions.                           ║
 # ║  Create, delete, list, and modify templates.                                 ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
+from typing import Any
+
+import responses  # discord interaction-response builders
 
 
 # ==========================================================================================
 #                                  /TEMPLATE COMMAND
 # ==========================================================================================
-def handle(subcommand, options, body):
+def handle(subcommand: str, options: list[dict[str, Any]], body: dict[str, Any]) -> responses.ApiResponse:
 
     # --------------------------------CREATE--------------------------------
     if subcommand == "create":
@@ -27,3 +30,6 @@ def handle(subcommand, options, body):
     # --------------------------------MODIFY--------------------------------
     if subcommand == "modify":
         pass
+
+    # every branch above is still a stub -- reply instead of handing api gateway a None
+    return responses.plain_message(f"`/template {subcommand}` isn't built yet :(")

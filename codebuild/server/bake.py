@@ -6,10 +6,14 @@
 # ║  Each type is a class with the same methods, so main stays type-blind.       ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
+from __future__ import annotations
+
+import contextlib
 import json
 import os
 import time
 import traceback
+from typing import TYPE_CHECKING, Any, Final
 
 import boto3
 import discord
@@ -23,49 +27,54 @@ from errors import BakeError
 # ------------------------------------------------------------------------------------------
 from recipes.vanilla import Vanilla
 
+# stub-only packages -- pip'd for ci, NOT in codebuild, so they can only be imported for mypy
+if TYPE_CHECKING:
+    from mypy_boto3_ec2 import EC2Client
+    from mypy_boto3_ec2.type_defs import TagTypeDef
+    from mypy_boto3_ssm import SSMClient
+
 # from recipes.modpack import Modpack
 # from recipes.custom import Custom
 
-RECIPES = {
+# only one recipe so far, so the value type is just Vanilla's class. once modpack lands this
+# wants a Protocol describing the shared methods, so main stays typed AND type-blind
+RECIPES: dict[str, type[Vanilla]] = {
     "vanilla": Vanilla,
     # "modpack": Modpack,
     # "custom":  Custom,
 }
-BUILDER_TYPE = "t4g.small"
-BUILDER_TAGS = [
-    {
-        "Key": "Project",
-        "Value": "craftform",
-    },
-    {
-        "Key": "Role",
-        "Value": "builder",
-    }
-]
+# Final so mypy keeps it as the literal "t4g.small" -- run_instances only accepts real instance types
+BUILDER_TYPE: Final = "t4g.small"
+
+# every bake resource gets the project tag -- the builder also gets Role=builder, which is
+# what SendCommand is scoped to
+PROJECT_TAGS: list[TagTypeDef] = [{"Key": "Project", "Value": "craftform"}]
+BUILDER_TAGS: list[TagTypeDef] = [*PROJECT_TAGS, {"Key": "Role", "Value": "builder"}]
+
 
 # =====================================PICK THE RECIPE======================================
-# hands back the class already instantiated -- the constructor reads whatever env vars that
-# type needs, so main just holds a recipe from here on
+# hands back the recipe CLASS -- main calls .resolve() on it, which reads whatever env vars
+# that type needs and builds the instance
 # ------------------------------------------------------------------------------------------
-def pick_recipe(server_type):
+def pick_recipe(server_type: str) -> type[Vanilla]:
 
     if server_type not in RECIPES:
         raise ValueError(f"'{server_type}' isn't a server type I know how to bake :(")
 
     return RECIPES[server_type]
 
+
 # =====================================INSTANCE DETAILS=====================================
 # the two things that change per-bake -- newest arm64 al2023, and a subnet in an az that
 # actually offers the builder type today
 # ------------------------------------------------------------------------------------------
-def instance_details(ec2, config):
+def instance_details(ec2: EC2Client, config: dict[str, Any]) -> tuple[str, str]:
 
     # capture the available images offered by amazon and have the specific name
     images = ec2.describe_images(
         Owners=["amazon"],
         Filters=[{"Name": "name", "Values": ["al2023-ami-2023.*-arm64"]}, {"Name": "state", "Values": ["available"]}],
-
-    )['Images']
+    )["Images"]
     # the base image used for the bake -- returns the biggest item by creation date
     base_image = max(images, key=lambda x: x["CreationDate"])["ImageId"]
 
@@ -77,7 +86,7 @@ def instance_details(ec2, config):
 
     zones = {az["Location"] for az in offered_az}
     # the subnet used for the bake
-    subnet = next((subnet for az, subnet in config["subnet_ids"].items() if az in zones), None)
+    subnet: str | None = next((subnet for az, subnet in config["subnet_ids"].items() if az in zones), None)
 
     # make sure a subnet actually returned
     if subnet is None:
@@ -85,11 +94,12 @@ def instance_details(ec2, config):
 
     return base_image, subnet
 
+
 # ====================================START THE INSTANCE====================================
 # launches the builder and hands back its id -- the tags aren't decoration, SendCommand is
 # scoped to Role=builder so it can't drive anything else
 # ------------------------------------------------------------------------------------------
-def start_instance(ec2,config, base_image, subnet):
+def start_instance(ec2: EC2Client, config: dict[str, Any], base_image: str, subnet: str) -> str:
     # launch the ec2
     response = ec2.run_instances(
         ImageId=base_image,
@@ -101,36 +111,27 @@ def start_instance(ec2,config, base_image, subnet):
         # the badge the agent needs to register -- borrowed off the region's server profile :)
         IamInstanceProfile={"Name": config["instance_profile"]},
         TagSpecifications=[
-            {
-                "ResourceType": "instance",
-                'Tags': BUILDER_TAGS
-            },
-            {
-                "ResourceType": "volume",
-                'Tags': BUILDER_TAGS
-            }
-        ]
-
+            {"ResourceType": "instance", "Tags": BUILDER_TAGS},
+            {"ResourceType": "volume", "Tags": BUILDER_TAGS},
+        ],
     )
 
     # check the response back -- boto3 cancels the request if there's an error for me already so i don't have to check it
     print("Server created successfully :))")
-    return response['Instances'][0]['InstanceId']
+    return response["Instances"][0]["InstanceId"]
+
 
 # ====================================WAIT FOR THE AGENT====================================
 # running just means the hardware's on -- the agent needs another minute to check in, and
 # SendCommand throws InvalidInstanceId until it does. no boto3 waiter for this one :(
 # ------------------------------------------------------------------------------------------
-def wait_for_ssm(ssm, instance_id, timeout=300):
+def wait_for_ssm(ssm: SSMClient, instance_id: str, timeout: int = 300) -> None:
 
     deadline = time.time() + timeout
 
     while time.time() < deadline:
-
         # comes back empty until it registers -- that's the wait, not an error
-        registered = ssm.describe_instance_information(
-            Filters=[{"Key": "InstanceIds", "Values": [instance_id]}]
-        )["InstanceInformationList"]
+        registered = ssm.describe_instance_information(Filters=[{"Key": "InstanceIds", "Values": [instance_id]}])["InstanceInformationList"]
 
         if registered and registered[0]["PingStatus"] == "Online":
             print("Builder checked in with ssm :))")
@@ -141,26 +142,27 @@ def wait_for_ssm(ssm, instance_id, timeout=300):
     raise BakeError("The builder never checked in with SSM, so the bake can't start :(")
 
 
-def run_install(ssm, instance_id, commands):
+# ====================================RUN THE INSTALL=======================================
+# sends the recipe's script to the builder and waits it out. the result is read either way
+# below, so a failed script surfaces its own output instead of a bare waiter error
+# ------------------------------------------------------------------------------------------
+def run_install(ssm: SSMClient, instance_id: str, commands: list[str]) -> None:
 
     command_id = ssm.send_command(
         InstanceIds=[instance_id],
         DocumentName="AWS-RunShellScript",
         Parameters={
             "commands": commands,
-        }
+        },
     )["Command"]["CommandId"]
 
-    try:
+    # the waiter ALSO raises when the script itself fails -- that's handled by the exit code check
+    with contextlib.suppress(WaiterError):
         ssm.get_waiter("command_executed").wait(
             CommandId=command_id,
             InstanceId=instance_id,
             WaiterConfig={"Delay": 15, "MaxAttempts": 80},
         )
-
-
-    except WaiterError:
-        pass
 
     result = ssm.get_command_invocation(
         InstanceId=instance_id,
@@ -168,36 +170,35 @@ def run_install(ssm, instance_id, commands):
     )
 
     print(f"install exit code: {result['ResponseCode']}")
-    print(result['StandardOutputContent'])
-    print(result['StandardErrorContent'])
+    print(result["StandardOutputContent"])
+    print(result["StandardErrorContent"])
 
-    if result['ResponseCode'] != 0:
+    if result["ResponseCode"] != 0:
         raise BakeError(f"The build failed with {result['StandardOutputContent']} :(")
 
-def build_template(ec2, instance_id, image_name) -> str:
+
+# =====================================BAKE THE IMAGE=======================================
+def build_template(ec2: EC2Client, instance_id: str, image_name: str) -> str:
     response = ec2.create_image(
         InstanceId=instance_id,
         Name=image_name,
         TagSpecifications=[
-            {"ResourceType": "image", "Tags": [
-                {"Key": "Project", "Value": "craftform"}
-            ]},
-            {"ResourceType": "snapshot", "Tags": [
-                {"Key": "Project", "Value": "craftform"}
-            ]}
-        ]
+            {"ResourceType": "image", "Tags": PROJECT_TAGS},
+            {"ResourceType": "snapshot", "Tags": PROJECT_TAGS},
+        ],
     )
 
-    return response['ImageId']
+    return response["ImageId"]
+
 
 # ===========================================MAIN===========================================
 # type-blind start to finish -- pick a recipe, resolve it, stand up a builder, bake on it
 # ------------------------------------------------------------------------------------------
-def main():
+def main() -> None:
 
     # "flags" to check and see if the build succeeded
-    instance_id = None
-    image_id = None
+    instance_id: str | None = None
+    image_id: str | None = None
     image_finished = False
 
     # both clients live in the DEPLOY region -- the agent checks in where the box lives,
@@ -213,7 +214,6 @@ def main():
         image_id = recipe.cache_check(ec2)
 
         if image_id is None:
-
             config = json.loads(os.environ["REGION_CONFIG"])
 
             # get the deployment details for the instance
@@ -240,10 +240,8 @@ def main():
                 WaiterConfig={"Delay": 15, "MaxAttempts": 40},
             )
 
-
         # flag to make sure it finished
         image_finished = True
-
 
         # get the details of the image and set a record in ssm/dynamo for it
 
@@ -251,33 +249,22 @@ def main():
 
         # put the records into ssm/dynamodb
 
-
     except BakeError as e:
         discord.followup(str(e))
         raise
-
 
     except Exception:
         discord.followup("The build failed :(")
         traceback.print_exc()
         raise
 
-
     finally:
         if instance_id is not None:
-            ec2.terminate_instances(
-                InstanceIds = [instance_id]
-            )
+            ec2.terminate_instances(InstanceIds=[instance_id])
 
         if image_id and not image_finished:
-            ec2.deregister_image(
-                ImageId = image_id,
-                DeleteAssociatedSnapshots = True
-            )
-
+            ec2.deregister_image(ImageId=image_id, DeleteAssociatedSnapshots=True)
 
 
 if __name__ == "__main__":
     main()
-
-

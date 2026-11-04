@@ -21,8 +21,8 @@ _SECRET_ID = "craftform-secrets"
 
 # ======================================GET SECRET======================================
 # fetched fresh every call ON PURPOSE -- secrets can rotate, so we don't cache it :)
-def get_secret(name):
-    secret_dict = json.loads(secrets.get_secret_value(SecretId=_SECRET_ID)["SecretString"])
+def get_secret(name: str) -> str:
+    secret_dict: dict[str, str] = json.loads(secrets.get_secret_value(SecretId=_SECRET_ID)["SecretString"])
 
     try:
         return secret_dict[name]

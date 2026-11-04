@@ -137,8 +137,9 @@
                           && tflint --init >/dev/null \
                           && tflint --recursive --format compact ); }
 
-            # ---- the lambdas ---- (matches the startup/operations matrix)
-            py() { ( cd "$ROOT/lambda/$1" \
+            # ---- the python ---- (matches the lambda-ci.yaml matrix)
+            # takes a path from the repo root, so non-lambda code like the bake fits too
+            py() { ( cd "$ROOT/$1" \
                      && ruff format --diff . \
                      && ruff check . \
                      && mypy . \
@@ -160,8 +161,9 @@
             step "terraform fmt"        tf_fmt
             step "terraform validate"   tf_val
             step "tflint"               tf_lint
-            step "lambda: startup"      py startup
-            step "lambda: operations"   py operations
+            step "lambda: startup"      py lambda/startup
+            step "lambda: operations"   py lambda/operations
+            step "codebuild: server"    py codebuild/server
             step "gitleaks"             leaks
             step "checkov"              iac
 

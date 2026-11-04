@@ -23,19 +23,21 @@ jobs:
     name: Quality - ${{ matrix.package }}
     runs-on: ubuntu-latest
 
-    # matrix the workflow between both the startup and operations code
+    # matrix the workflow across every python package -- both lambdas plus the codebuild
+    # server bake. `package` is only the label (it names the check, so startup/operations
+    # keep their old "Quality - <name>" checks), `dir` is where the code actually lives
     strategy:
-      fail-fast: false    # make sure if one matrix fails, the other one runs too
+      fail-fast: false    # make sure if one matrix fails, the others run too
       matrix:
-        package: [
-          startup,
-          operations
-        ]
+        include:
+          - { package: startup,         dir: lambda/startup }
+          - { package: operations,      dir: lambda/operations }
+          - { package: codebuild-server, dir: codebuild/server }
 
     # the working directory for the specific code matrix
     defaults:
       run:
-        working-directory: lambda/${{ matrix.package }}
+        working-directory: ${{ matrix.dir }}
     
     steps:
 

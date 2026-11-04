@@ -8,7 +8,9 @@ http = urllib3.PoolManager(timeout=10)
 FOLLOWUP_URL = "https://discord.com/api/v10/webhooks/{app_id}/{token}/messages/@original"
 
 
-def followup(text):
+# edit the "thinking..." message the operations lambda deferred. returns False instead of
+# raising -- a report that can't reach discord shouldn't hide the bake's real error
+def followup(text: str) -> bool:
     try:
         url = FOLLOWUP_URL.format(
             app_id=os.environ["DISCORD_APP_ID"],
@@ -27,7 +29,7 @@ def followup(text):
         return False
 
     if response.status != 200:
-        print(f"Discord rejected the followup: {response.status} - {response.data} :(")
+        print(f"Discord rejected the followup: {response.status} - {response.data.decode()} :(")
         return False
 
     return True

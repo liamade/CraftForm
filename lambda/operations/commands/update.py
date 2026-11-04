@@ -7,6 +7,7 @@
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 import json
+from typing import Any
 
 import responses  # discord interaction-response builders -- responses.deferred(), etc.
 from aws_clients import lambda_client  # shared client -- no need to build our own
@@ -15,7 +16,8 @@ from aws_clients import lambda_client  # shared client -- no need to build our o
 # ==========================================================================================
 #                                   /UPDATE COMMAND
 # ==========================================================================================
-def handle(subcommand, options, body):
+# subcommand + options go unused -- /update has neither, but every handler shares one signature
+def handle(subcommand: str | None, options: list[dict[str, Any]], body: dict[str, Any]) -> responses.ApiResponse:
 
     # ======================INVOKE STAGING FUNCTION=======================
     lambda_client.invoke(

@@ -11,6 +11,7 @@
 # ==========================================================================================
 import base64
 import json
+from typing import Any
 
 import responses  # discord interaction-response builders -- responses.pong(), etc.
 from commands import region, server, template, update  # the actual command handlers
@@ -21,7 +22,8 @@ from services import ssm  # ssm helpers -- call as ssm.get_discord_public_key(),
 # ==========================================================================================
 #                                 DISCORD API INTERACTIONS
 # ==========================================================================================
-def handler(event, context):
+# context is lambda's runtime info object -- we never touch it, so `object` is all we promise
+def handler(event: dict[str, Any], context: object) -> responses.ApiResponse:
 
     print("Received event:", json.dumps(event))  # log the incoming event for debugging
 
@@ -59,7 +61,13 @@ def handler(event, context):
     if body["type"] == 2:
         command = body["data"]["name"]  # which top-level command was used
         options = body["data"].get("options", [])  # top-level commands like /update have no subcommands, so this can be empty
-        subcommand = options[0]["name"] if options else None  # only grab a subcommand if there actually is one
+
+        # /update is the only command with no subcommand -- route it before we go looking for one
+        if command == "update":
+            return update.handle(None, options, body)
+
+        # every other command is registered WITH subcommands, so discord guarantees one is here
+        subcommand: str = options[0]["name"]
 
         if command == "server":
             return server.handle(subcommand, options, body)
@@ -70,9 +78,6 @@ def handler(event, context):
         if command == "region":
             return region.handle(subcommand, options, body)
 
-        if command == "update":
-            return update.handle(subcommand, options, body)
-
     # ====================================ROUTE AUTOCOMPLETE===================================
     # type 4 = discord asking what to suggest while the user is still typing. fires on
     # every keystroke, so these handlers stay cheap :)
@@ -81,7 +86,7 @@ def handler(event, context):
         options = body["data"].get("options", [])
 
         if command == "server":
-            return server.autocomplete(options, body)
+            return server.autocomplete(options)
 
     # ====================================ROUTE COMPONENTS + MODALS===================================
     # type 3 = clicked a button / picked from a dropdown | type 5 = submitted a modal.
@@ -97,11 +102,15 @@ def handler(event, context):
         if command == "server":
             return server.handle(subcommand, [], body)
 
+    # an interaction type or command we don't route -- answer instead of handing api gateway a None
+    print("Nothing routes this interaction:", json.dumps(body.get("data", {})))
+    return responses.plain_message("I don't know how to handle that one :(")
+
 
 # ==========================================================================================
 #                    VERIFY DISCORD SIGNATURE AND HANDLE INTERACTIONS
 # ==========================================================================================
-def verify_signature(event, raw_body, public_key):
+def verify_signature(event: dict[str, Any], raw_body: str, public_key: str) -> bool:
 
     signature = event["headers"]["x-signature-ed25519"]  # get the signature from the request headers
     timestamp = event["headers"]["x-signature-timestamp"]  # get the timestamp from the request headers

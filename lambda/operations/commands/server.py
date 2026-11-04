@@ -16,6 +16,7 @@
 
 import json
 import re
+from typing import Any
 
 import regions  # the catalog -- regions.label(code) for the friendly name
 import responses
@@ -41,10 +42,15 @@ SIZES = {
 # fmt: on
 
 
+# raised by build_env when a pre-flight check fails -- the message is already worded for the user
+class PreflightError(Exception):
+    pass
+
+
 # ==========================================================================================
 #                                   /SERVER COMMAND
 # ==========================================================================================
-def handle(subcommand, options, body):
+def handle(subcommand: str, options: list[dict[str, Any]], body: dict[str, Any]) -> responses.ApiResponse:
 
     # ===============================<START>================================
     if subcommand == "start":
@@ -109,15 +115,16 @@ def handle(subcommand, options, body):
     # =========================<CREATE :: THE MODAL SUBMIT>=========================
     # api gateway is synchronous, so everything has to happen before the return :)
 
-    elif subcommand and subcommand.startswith("form:"):
+    elif subcommand.startswith("form:"):
         _, variant, region, action = subcommand.split(":")
 
-        # one call does the checking AND the packing -- we get either the handoff or a reason
-        env, error = build_env(variant, region, responses.modal_values(body), body, action)
+        # one call does the checking AND the packing -- we get either the handoff or a PreflightError
+        try:
+            env = build_env(variant, region, responses.modal_values(body), body, action)
 
         # every rejection comes back already worded for the user, so just forward it
-        if error:
-            return responses.plain_message(error)
+        except PreflightError as rejection:
+            return responses.plain_message(str(rejection))
 
         if not codebuild.start_build(SERVER_PROJECT, env):
             return responses.plain_message("Couldn't kick off the server build :(")
@@ -154,14 +161,17 @@ def handle(subcommand, options, body):
     else:
         return responses.plain_message(f"Unknown /server subcommand: `{subcommand}`. :(")
 
+    # the `pass` stubs above (and any create variant we don't handle) land here
+    return responses.plain_message(f"`/server {subcommand}` isn't built yet :(")
+
 
 # ==========================================================================================
 #                              BUILD THE CODEBUILD HANDOFF
 # ==========================================================================================
 # this builds everything needed for the codebuild project to run. it does pre-flight checks
-# on the args. It returns the env dict for the build
+# on the args. It returns the env dict for the build, or raises PreflightError with the reason
 # ------------------------------------------------------------------------------------------
-def build_env(variant, region, fields, body, action):
+def build_env(variant: str, region: str, fields: dict[str, str], body: dict[str, Any], action: str) -> dict[str, str]:
     # fmt: off
     name       = fields["name"].strip().lower()
     mc_version = fields["mc_version"].strip().lower()
@@ -170,27 +180,27 @@ def build_env(variant, region, fields, body, action):
 
     # -------------------------------<REJECTIONS>-------------------------------
     if not NAME_PATTERN.match(name):
-        return None, f"`{name}` won't work as a name — stick to letters, numbers, `-`, `_` and `.` (3–32 characters)."
+        raise PreflightError(f"`{name}` won't work as a name — stick to letters, numbers, `-`, `_` and `.` (3–32 characters).")
 
     if size not in SIZES:
-        return None, f"`{size}` isn't a size I know — pick `small`, `medium`, or `large`."
+        raise PreflightError(f"`{size}` isn't a size I know — pick `small`, `medium`, or `large`.")
 
     if not VERSION_PATTERN.match(mc_version):
-        return None, f"`{mc_version}` isn't a version I recognise — try `latest` or something like `1.21.1`."
+        raise PreflightError(f"`{mc_version}` isn't a version I recognise — try `latest` or something like `1.21.1`.")
 
     # make sure the name isn't already taken in the region.
     if action == "create" and name in ssm.list_names_under(f"/craftform/regions/{region}/servers/"):
-        return None, f"There's already a server called `{name}` in {region} :("
+        raise PreflightError(f"There's already a server called `{name}` in {region} :(")
 
     # gather the region configs for the build
     try:
         config = ssm.region_config(region)
     except Exception as e:
         print(f"Couldn't read the region config for {region}: {e} :(")
-        return None, f"`{region}` doesn't look deployed any more — run `/region list` to see what's still up."
+        raise PreflightError(f"`{region}` doesn't look deployed any more — run `/region list` to see what's still up.") from e
 
     # --------------------------------<HANDOFF>---------------------------------
-    # returns the env dict for the build, and None for the error if there is any.
+    # every check passed -- hand back the env dict for the build
     # fmt: off
     return {
         "SERVER_NAME":      name,
@@ -204,7 +214,7 @@ def build_env(variant, region, fields, body, action):
         "DISCORD_GUILD_ID": body.get("guild_id") or "",                                # for /list filtering
         "DISCORD_APP_ID":   body["application_id"],
         "DISCORD_TOKEN":    body["token"],  # interaction token, NOT the bot token
-    }, None
+    }
     # fmt: on
 
 
@@ -214,7 +224,7 @@ def build_env(variant, region, fields, body, action):
 # create is a subcommand GROUP, so what the user typed sits two layers down:
 #   options[0]["options"][0]  = the variant, and ITS options are the args
 # ------------------------------------------------------------------------------------------
-def create_args(options):
+def create_args(options: list[dict[str, Any]]) -> tuple[str, dict[str, Any]]:
     # walk down the options tree to the variant and its args
     variant_option = options[0]["options"][0]
     args = {option["name"]: option.get("value") for option in variant_option.get("options", [])}
@@ -230,7 +240,7 @@ def create_args(options):
 # variant-blind on purpose -- vanilla/modpack/custom all get region suggestions from the
 # same branch, so a new variant needs the option REGISTERED, not code in here :)
 # ------------------------------------------------------------------------------------------
-def autocomplete(options, body):
+def autocomplete(options: list[dict[str, Any]]) -> responses.ApiResponse:
 
     # gets the focused option (the one the cursor is actually in)
     focused = focused_option(options)
@@ -241,12 +251,9 @@ def autocomplete(options, body):
         typed = (focused.get("value") or "").lower()
 
         # capture the regions that are actually deployed and match what the user typed
-        deployed = []
-        for code in ssm.list_names_under("/craftform/regions/"):
-            if typed in code.lower() or typed in regions.label(code).lower():
-                deployed.append(code)
+        deployed = [code for code in ssm.list_names_under("/craftform/regions/") if typed in code.lower() or typed in regions.label(code).lower()]
 
-        # return only the
+        # return only the matches, sorted by their friendly name
         return responses.autocomplete([{"name": regions.label(code), "value": code} for code in sorted(deployed, key=regions.label)])
 
     # return nothing if the focused option isn't the region one
@@ -257,7 +264,7 @@ def autocomplete(options, body):
 # find the focused option (the one the cursor is in) so we can see if it's something we need
 # to autocomplete
 # ------------------------------------------------------------------------------------------
-def focused_option(options):
+def focused_option(options: list[dict[str, Any]]) -> dict[str, Any] | None:
     # walk down the options tree until we find the one the cursor is actually in
     for option in options:
         if option.get("focused"):

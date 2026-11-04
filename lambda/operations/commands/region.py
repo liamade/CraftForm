@@ -6,7 +6,7 @@
 # ║  Create, delete, and list regions.                                           ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
-import json
+from typing import Any
 
 import regions  # the catalog -- regions.SUPPORTED (codes) + regions.label(code)
 import responses  # discord interaction-response builders
@@ -24,7 +24,7 @@ REGION_PROJECT = "craftform-region"
 # ==========================================================================================
 #                                   /REGION COMMAND
 # ==========================================================================================
-def handle(subcommand, options, body):
+def handle(subcommand: str, options: list[dict[str, Any]], body: dict[str, Any]) -> responses.ApiResponse:
 
     # ================================<CREATE>================================
     if subcommand == "create":
@@ -70,7 +70,7 @@ def handle(subcommand, options, body):
         action = subcommand.split("_")[1]
 
         # capture the region
-        region = body["data"]["values"][0]
+        region: str = body["data"]["values"][0]
 
         if action == "destroy":
             # guard the destroy -- if the region's s3 bucket still has objects in it
@@ -100,11 +100,16 @@ def handle(subcommand, options, body):
         # tell discord we're thinking - the build will tell discord what happened :)
         return responses.deferred()
 
+    # anything we don't recognise -- answer instead of handing api gateway a None
+    return responses.plain_message(f"Unknown region subcommand `{subcommand}` :(")
+
 
 # ==========================================================================================
 #                                 REGION ATLAS (LIST)
 # ==========================================================================================
-def region_atlas(active_regions):
+def region_atlas(active_regions: list[str]) -> responses.ApiResponse:
+    embed: dict[str, Any]
+
     # no regions yet -- give them a friendly nudge instead of an empty void
     if not active_regions:
         embed = {
@@ -124,16 +129,4 @@ def region_atlas(active_regions):
             "footer": {"text": f"{len(active_regions)} region(s) standing tall"},
         }
 
-    return {
-        "statusCode": 200,
-        "headers": {"Content-Type": "application/json"},
-        "body": json.dumps(
-            {
-                "type": 4,
-                "data": {
-                    "flags": 64,  # only visible to the user who ran the command
-                    "embeds": [embed],
-                },
-            }
-        ),
-    }
+    return responses.embed(embed)

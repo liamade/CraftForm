@@ -62,6 +62,21 @@ def plain_message(text: str) -> ApiResponse:
     # fmt: on
 
 
+# =======================================EMBED==========================================
+# type 4 with a single embed -- the fancy card with a title, colour bar, footer etc.
+# `embed` is a ready-made embed dict the CALLER builds, same deal as drop_down's options
+def embed(embed: dict[str, Any]) -> ApiResponse:
+    # fmt: off
+    return _respond({
+        "type": 4,
+        "data": {
+            "flags": EPHEMERAL,
+            "embeds": [embed],
+        },
+    })
+    # fmt: on
+
+
 # =====================================DROP DOWN========================================
 # type 4 with a string select menu. `options` is a ready-made list of
 # {"label": ..., "value": ...} dicts -- the CALLER builds those so we stay domain-agnostic
