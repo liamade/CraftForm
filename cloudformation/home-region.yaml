@@ -1006,8 +1006,8 @@ Resources:
           # ================AWS CLIENT================
           s3 = boto3.client('s3')  # used by stage_assets, which BOTH the /update and cloudformation paths call - so it stays global
 
-          # the release assets we stage -- the two lambda zips, plus the terraform source
-          # that the codebuild project pulls down at the start of every region run
+          # the release assets we stage -- the two lambda zips, the terraform source the region
+          # codebuild pulls down every run, and the server bake the server codebuild runs
           assets = ['startup.zip', 'operations.zip', 'terraform.zip', 'server.zip']
           base = "https://github.com/Liamade/CraftForm/releases"
 

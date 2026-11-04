@@ -9,7 +9,7 @@
 # how this connects to the root -- see the note in lambda/operations/pyproject.toml
 
 [project]
-name = "craftform-server-bake"
+name = "craftform-server"     # matches the codebuild project + server.zip
 version = "0.0.0"               # unused -- git tags version the releases
 requires-python = "==3.12.*"    # buildspec.yaml's `python: 3.12`, exactly
 

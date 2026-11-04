@@ -4,10 +4,10 @@
 #╠══════════════════════════════════════════════════════════════════════════════╣
 #║  GITHUB ACTIONS  ::  release.yaml                                            ║
 #║  Builds every artifact a CraftForm install pulls down -- the startup and     ║
-#║  operations lambda zips, plus the terraform source with its buildspec        ║
-#║  riding inside it -- then publishes them as GitHub release assets for the    ║
-#║  bootstrap stager to pull. The workflow is not heavy enough to qualify       ║
-#║  for a matrix approach                                                       ║
+#║  operations lambda zips, the server bake zip, plus the terraform source      ║
+#║  with its buildspec riding inside it -- then publishes them as GitHub        ║
+#║  release assets for the bootstrap stager to pull. The workflow is not        ║
+#║  heavy enough to qualify for a matrix approach                               ║
 #╚══════════════════════════════════════════════════════════════════════════════╝
 
 
@@ -38,6 +38,11 @@ on:
 permissions:
   contents: write    # needed to create releases and upload assets
 
+# PYTHON PACKAGES: every python folder that ships. each one becomes <folder name>.zip,
+# built from the uv package craftform-<folder name>
+env:
+  PACKAGES: lambda/startup lambda/operations codebuild/server
+
 
 
 #============================================================
@@ -57,7 +62,7 @@ jobs:
       - name: Checkout Repository 
         uses: actions/checkout@v7
 
-      # UV + PYTHON SETUP: python 3.12 for building the lambda code, uv to pull its deps out of uv.lock
+      # UV + PYTHON SETUP: python 3.12 for building the python code, uv to pull its deps out of uv.lock
       - name: Set up uv + Python
         uses: astral-sh/setup-uv@v10.3.3
         with:
@@ -65,20 +70,21 @@ jobs:
           python-version: '3.12'
 
 
-      # BUILD LAMBDA CODE: install dependencies and build the lambda code into a zip file for distribution
-      - name: Build Lambda Code
+      # BUILD PYTHON CODE: install dependencies and build each python package into a zip file for distribution
+      - name: Build Python Code
         run: |
-          # BUILD OUT THE LAMBDA CODE
-          for function in startup operations; do
+          # BUILD OUT EVERY PYTHON PACKAGE -- the two lambdas and the server bake, all the same way
+          for dir in $PACKAGES; do
+            name=$(basename $dir)   # lambda/startup -> startup, codebuild/server -> server
 
 
-            # DEPENDENCIES -- pull this lambda's runtime deps out of uv.lock and install them.
+            # DEPENDENCIES -- pull this package's runtime deps out of uv.lock and install them INTO the zip.
             # --locked breaks the release if the lock is stale. lands in RUNNER_TEMP so it stays out of the zip
-            uv export --package craftform-$function --no-dev --locked --no-emit-workspace \
-              -o "$RUNNER_TEMP/$function-requirements.txt"
+            uv export --package craftform-$name --no-dev --locked --no-emit-workspace \
+              -o "$RUNNER_TEMP/$name-requirements.txt"
             # --python-platform: grab the builds that run on LAMBDA's linux (glibc 2.34), not whatever
             # suits this runner -- a newer runner could otherwise pull a pynacl that lambda can't load
-            uv pip install -r "$RUNNER_TEMP/$function-requirements.txt" --target lambda-build/$function \
+            uv pip install -r "$RUNNER_TEMP/$name-requirements.txt" --target lambda-build/$name \
               --python-platform x86_64-manylinux_2_34 --python-version 3.12
 
             # COPY DIRECTORY -- copy everthing except certain files
@@ -86,16 +92,21 @@ jobs:
               --exclude='__pycache__' \
               --exclude='*.pyc' \
               --exclude='.mypy_cache' \
+              --exclude='.pytest_cache' \
               --exclude='pyproject.toml' \
-              lambda/$function/ lambda-build/$function/
+              $dir/ lambda-build/$name/
 
             # ZIP FILES -- zip files to make an actual release
             (
-              cd lambda-build/$function
-              zip -r ../../$function.zip .
+              cd lambda-build/$name
+              zip -r ../../$name.zip .
             )
 
           done
+
+          # SANITY CHECK -- codebuild reads buildspec.yaml from the ROOT of server.zip, so same deal
+          # as terraform.zip below: break the release here instead of every /server create :(
+          unzip -l server.zip buildspec.yaml >/dev/null || { echo "buildspec.yaml missing from server.zip :("; exit 1; }
 
       # BUILD TERRAFORM SOURCE: the codebuild project pulls this down and runs it on every /region create or delete
       - name: Build Terraform Source
@@ -133,5 +144,6 @@ jobs:
           files: |
             startup.zip
             operations.zip
+            server.zip
             terraform.zip
   

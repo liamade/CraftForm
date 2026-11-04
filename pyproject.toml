@@ -7,7 +7,7 @@
 members = [
   "lambda/operations",    # craftform-operations -- the discord interactions lambda
   "lambda/startup",       # craftform-startup    -- the cloudformation custom resource
-  "codebuild/server",     # craftform-server-bake -- the AMI bake codebuild runs
+  "codebuild/server",     # craftform-server     -- the AMI bake codebuild runs
 ]
 
 # ------------------------------------------------------------------------------------------

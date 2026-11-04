@@ -45,11 +45,11 @@ phases:
  # ----------------------------------------------------------
  #                        SETUP
  # ----------------------------------------------------------
+  # nothing to pip install -- the release already put boto3 + urllib3 inside server.zip,
+  # right next to bake.py, so python just finds them
   install:
     runtime-versions:
       python: 3.12
-    commands:
-      - pip install -r requirements.txt   # NOT in git -- gets exported from uv.lock when server.zip is built
 
  # ----------------------------------------------------------
  #                        THE BAKE

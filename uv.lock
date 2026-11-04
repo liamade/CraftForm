@@ -5,7 +5,7 @@ requires-python = "==3.12.*"
 [manifest]
 members = [
     "craftform-operations",
-    "craftform-server-bake",
+    "craftform-server",
     "craftform-startup",
 ]
 
@@ -214,7 +214,7 @@ requires-dist = [
 ]
 
 [[package]]
-name = "craftform-server-bake"
+name = "craftform-server"
 version = "0.0.0"
 source = { virtual = "codebuild/server" }
 dependencies = [
