@@ -15,8 +15,8 @@
 
     // ==================== PYTHON ====================
     // ruff is what ci gates on, so let it own linting in-editor too.
-    // format-on-save is deliberately OFF -- see the note in the chat, ruff would
-    // flatten the aligned comment blocks this codebase is written around
+    // format-on-save is deliberately OFF -- ruff would flatten the aligned
+    // comment blocks this codebase is written around
     "[python]": {
         "editor.defaultFormatter": "charliermarsh.ruff",
         "editor.formatOnSave": false

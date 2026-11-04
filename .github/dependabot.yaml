@@ -2,7 +2,7 @@
 #║                              CraftForm                                       ║
 #╠══════════════════════════════════════════════════════════════════════════════╣
 #║  DEPENDABOT  ::  dependabot.yaml                                             ║
-#║  Preforms automated dependency and security checks                           ║
+#║  Performs automated dependency and security checks                           ║
 #║  Checks to make sure there aren't newer version for actions and dependenceies║
 #╚══════════════════════════════════════════════════════════════════════════════╝
 version: 2

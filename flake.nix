@@ -113,12 +113,16 @@
                           && tflint --recursive --format compact ); }
 
             # ---- the python ---- (matches the lambda-ci.yaml matrix)
-            # takes a path from the repo root, so non-lambda code like the bake fits too
+            # takes a path from the repo root, so non-lambda code like the bake fits too.
+            # within ONE package it stops at the first failure, same as the workflow does
+            # (fix the format diff, run again, then you'll see mypy etc).
+            # pytest exit 5 = "no tests yet" -- passes for now, same TODO as lambda-ci.yaml
             py() { ( cd "$ROOT/$1" \
                      && ruff format --diff . \
                      && ruff check . \
                      && mypy . \
-                     && bandit -r . -ll ); }
+                     && bandit -r . -ll \
+                     && { pytest || [ $? -eq 5 ]; } ); }
 
             # ---- security ----
             # the action scans history, so we do too. `git` replaced `detect` in
@@ -166,7 +170,7 @@
 
               # ================= PYTHON TOOLING ==============
               # uv is the ONLY python tool from nix -- everything else comes from uv.lock.
-              # the ci workflows pin setup-uv to this version, so move those with it
+              # required-version in the root pyproject.toml must match this -- bump them together
               pkgs.uv         # 0.12.5 as of this flake.lock
 
               # ================ EDITOR SUPPORT ===============

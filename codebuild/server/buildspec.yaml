@@ -57,15 +57,3 @@ phases:
   build:
     commands:
       - python bake.py
-
-
-
-
-
-
-
-
-
-
-
-

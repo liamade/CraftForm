@@ -2,7 +2,7 @@
 #║                              CraftForm                                       ║
 #╠══════════════════════════════════════════════════════════════════════════════╣
 #║  WORKFLOW  ::  lambda-ci.yaml                                                ║
-#║  Preforms automated code checks on the lambda python code                    ║
+#║  Performs automated code checks on the lambda python code                    ║
 #║  Acts as a child workflow to be called in other workflows                    ║
 #╚══════════════════════════════════════════════════════════════════════════════╝
 
@@ -44,11 +44,11 @@ jobs:
       - name: Checkout Repo
         uses: actions/checkout@v7
 
-      # PINNED to the flake's uv so laptop and ci read the lock the same. bump with nixpkgs
+      # no `version:` on purpose -- setup-uv reads required-version from the root pyproject.toml,
+      # the ONE place the uv version lives (matches the flake's uv)
       - name: Setup uv + Python
         uses: astral-sh/setup-uv@v10.3.3
         with:
-          version: "0.12.5"       # pkgs.uv
           python-version: "3.12"  # uv finds or downloads it
 
       # install from uv.lock. --locked FAILS if the lock is stale instead of quietly fixing it.
@@ -74,4 +74,9 @@ jobs:
       # performs a basic security scan on all the python files and ignore low-level severity
       - name: Security Scan
         run: bandit -r . -ll
+
+      # runs the tests. exit code 5 = "found no tests" -- let that pass while packages are still
+      # getting their first tests. TODO: drop the `|| [ $? -eq 5 ]` once every package has one
+      - name: Tests
+        run: pytest || [ $? -eq 5 ]
 

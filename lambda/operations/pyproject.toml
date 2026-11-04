@@ -20,5 +20,18 @@ dependencies = [
   "urllib3>=2",       # the discord http calls
 ]
 
-# no [build-system] on purpose -- this is just a folder that gets zipped, so uv
-# installs the deps and never tries to build it
+# this is just a folder that gets zipped, not an installable package -- uv installs
+# its deps and never tries to build it
+[tool.uv]
+package = false
+
+
+# ==========================================================================================
+#                                 PYTEST
+# ==========================================================================================
+# lives HERE, not in the root, so pytest treats this folder as its own little world:
+#   pythonpath -- lets tests do `import responses` the same way the lambda code does
+#   and it keeps this lambda's index.py from clashing with startup's index.py
+[tool.pytest]
+pythonpath = ["."]
+testpaths = ["tests"]

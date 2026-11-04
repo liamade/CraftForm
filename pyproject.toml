@@ -10,6 +10,11 @@ members = [
   "codebuild/server",     # craftform-server     -- the AMI bake codebuild runs
 ]
 
+# the ONE place the uv version lives. your local uv refuses to run if it doesn't match,
+# and setup-uv in every workflow installs exactly this. bump it with the flake's pkgs.uv
+[tool.uv]
+required-version = "==0.12.5"
+
 # ------------------------------------------------------------------------------------------
 # DEV TOOLS
 # ------------------------------------------------------------------------------------------
@@ -22,11 +27,21 @@ dev = [
   "bandit>=1.9.4",      # python security scan
   "pytest>=9.1.1",      # the test runner
   "cfn-lint>=1.43.3",   # the ci gate on cloudformation/*.yaml
-  "boto3>=1.42",        # the lambdas' runtime-provided boto3, for local tests
+  "boto3>=1.43.114",    # the lambdas' runtime-provided boto3, for local tests
 
-  # every extra any package needs -- [essential] is s3/ec2/lambda
-  "boto3-stubs[essential,ssm,secretsmanager,codebuild]>=1.43.114",
+  # exactly the aws services the code talks to -- add one here when the code does
+  "boto3-stubs[ec2,lambda,s3,ssm,secretsmanager,codebuild]>=1.43.114",
 ]
+
+
+# ==========================================================================================
+#                              MYPY CONFIGURATION
+# ==========================================================================================
+# mypy walks up to this file from each package, same as ruff.
+# check_untyped_defs: check the INSIDE of functions even if they have no type hints --
+# mypy's default skips them completely, so bugs in there would never show up
+[tool.mypy]
+check_untyped_defs = true
 
 
 # ==========================================================================================
@@ -48,7 +63,7 @@ line-length = 160   # change the threshold of characters per line
 # here that'd rot on its own.
 [tool.ruff.lint]
 
-# placeholder: pep8-naming on top of the default set
+# pep8-naming on top of the default set
 extend-select = ["N"]
 
 # rules turned off on purpose, with the reason. same spirit as the skip-check
