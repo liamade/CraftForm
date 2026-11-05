@@ -1,14 +1,22 @@
-
 #╔══════════════════════════════════════════════════════════════════════════════╗
 #║                                  CraftForm                                   ║
 #╠══════════════════════════════════════════════════════════════════════════════╣
 #║  GITHUB ACTIONS  ::  release.yaml                                            ║
 #║  Builds every artifact a CraftForm install pulls down -- the startup and     ║
-#║  operations lambda zips, plus the terraform source with its buildspec        ║
-#║  riding inside it -- then publishes them as GitHub release assets for the    ║
-#║  bootstrap stager to pull. The workflow is not heavy enough to qualify       ║
-#║  for a matrix approach                                                       ║
+#║  operations lambda zips, the server bake zip, plus the terraform source      ║
+#║  with its buildspec riding inside it -- then publishes them as GitHub        ║
+#║  release assets for the bootstrap stager to pull. The workflow is not        ║
+#║  heavy enough to qualify for a matrix approach                               ║
 #╚══════════════════════════════════════════════════════════════════════════════╝
+
+
+#============================================================
+#                 PYTHON PACKAGES
+#============================================================
+# every python folder that ships -- each one becomes <folder name>.zip,
+# built from the uv package craftform-<folder name>
+env:
+  PACKAGES: lambda/startup lambda/operations codebuild/server
 
 
 name: Release Workflow
@@ -34,10 +42,15 @@ on:
   push:
     tags: ['v*.*.*'] # trigger on version tags like v1.2.3
 
-# GIT PERMISSIONS: allow the git token to write to repo
+# GIT PERMISSIONS: read-only by default. only the release job below gets to write
 permissions:
-  contents: write    # needed to create releases and upload assets
+  contents: read
 
+# ONE RELEASE AT A TIME: a tag push + a manual run for the same version can't race each
+# other uploading zips. queue instead of cancel, a half-cancelled release is worse
+concurrency:
+  group: release-${{ inputs.version || github.ref_name }}
+  cancel-in-progress: false
 
 
 #============================================================
@@ -46,50 +59,77 @@ permissions:
 
 jobs:
 
+  # CHECKS JOB: the exact same ruff/mypy/bandit/pytest run as every PR. if the code is broken,
+  # nothing gets published -- "latest" is what every install downloads
+  checks:
+    uses: ./.github/workflows/lambda-ci.yaml
+
   # RELEASE JOB: job for building every artifact an install pulls down, creating the new release, and uploading them
   release:
-    if: github.repository == 'Liamade/CraftForm' # only run this workflow in the main repo, not in forks
+    needs: checks
+    # only the main repo (not forks), and only from main or a version tag -- a random branch
+    # can never turn into a release
+    if: >-
+      github.repository == 'Liamade/CraftForm' &&
+      (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/'))
     runs-on: ubuntu-latest
+    permissions:
+      contents: write    # needed to create releases and upload assets
 
+    # actions in here are pinned to an exact commit, not a tag -- this job can write to the repo,
+    # so a moved tag upstream can't sneak new code into it. dependabot bumps the sha + comment
     steps:
 
       # CHECKOUT AND SETUP: check out the code
-      - name: Checkout Repository 
-        uses: actions/checkout@v7
+      - name: Checkout Repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      # PYTHON SETUP: set up python 3.12 for building the lambda code
-      - name: Set up Python 
-        uses: actions/setup-python@v7
+      # UV + PYTHON SETUP: python 3.12 for building the python code, uv to pull its deps out of uv.lock.
+      # the uv version comes from required-version in the root pyproject.toml
+      - name: Set up uv + Python
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         with:
           python-version: '3.12'
 
 
-      # BUILD LAMBDA CODE: install dependencies and build the lambda code into a zip file for distribution
-      - name: Build Lambda Code
+      # BUILD PYTHON CODE: install dependencies and build each python package into a zip file for distribution
+      - name: Build Python Code
         run: |
-          # BUILD OUT THE LAMBDA CODE
-          for function in startup operations; do
-            
+          # BUILD OUT EVERY PYTHON PACKAGE -- the two lambdas and the server bake, all the same way
+          for dir in $PACKAGES; do
+            name=$(basename "$dir")   # lambda/startup -> startup, codebuild/server -> server
 
-            # DEPENDENCIES -- install required dependencies from the requirements.txt
-            pip install -r lambda/$function/requirements.txt -t lambda-build/$function 
-            
-            # COPY DIRECTORY -- copy everthing except certain files 
+
+            # DEPENDENCIES -- pull this package's runtime deps out of uv.lock and install them INTO the zip.
+            # --locked breaks the release if the lock is stale. lands in RUNNER_TEMP so it stays out of the zip
+            uv export --package "craftform-$name" --no-dev --locked --no-emit-workspace \
+              -o "$RUNNER_TEMP/$name-requirements.txt"
+            # --python-platform: grab the builds that run on LAMBDA's linux (glibc 2.34), not whatever
+            # suits this runner -- a newer runner could otherwise pull a pynacl that lambda can't load
+            uv pip install -r "$RUNNER_TEMP/$name-requirements.txt" --target "lambda-build/$name" \
+              --python-platform x86_64-manylinux_2_34 --python-version 3.12
+
+            # COPY DIRECTORY -- copy everthing except certain files (tests + dev config stay out of the zip)
             rsync -a \
               --exclude='__pycache__' \
               --exclude='*.pyc' \
               --exclude='.mypy_cache' \
-              --exclude='requirements*.txt' \
-              --exclude='requirements-dev.txt' \
-              lambda/$function/ lambda-build/$function/
+              --exclude='.pytest_cache' \
+              --exclude='pyproject.toml' \
+              --exclude='tests' \
+              "$dir/" "lambda-build/$name/"
 
             # ZIP FILES -- zip files to make an actual release
             (
-              cd lambda-build/$function
-              zip -r ../../$function.zip .
+              cd "lambda-build/$name"
+              zip -r "../../$name.zip" .
             )
 
           done
+
+          # SANITY CHECK -- codebuild reads buildspec.yaml from the ROOT of server.zip, so same deal
+          # as terraform.zip below: break the release here instead of every /server create :(
+          unzip -l server.zip buildspec.yaml >/dev/null || { echo "buildspec.yaml missing from server.zip :("; exit 1; }
 
       # BUILD TERRAFORM SOURCE: the codebuild project pulls this down and runs it on every /region create or delete
       - name: Build Terraform Source
@@ -111,21 +151,33 @@ jobs:
 
           # SANITY CHECK -- if the buildspec didn't make it in, every region deploy is dead, so
           # break the release here instead of letting a user find out weeks later :(
-          unzip -l terraform.zip | grep -q 'buildspec.yaml' || { echo "buildspec.yaml missing from terraform.zip :("; exit 1; }
+          unzip -l terraform.zip buildspec.yaml >/dev/null || { echo "buildspec.yaml missing from terraform.zip :("; exit 1; }
 
-      # CREATE GITHUB RELEASE: create a new release in GitHub using the version number from the workflow input
-      - name: Publish Release
+      # CREATE GITHUB RELEASE: create the release as a DRAFT and upload every zip into it. drafts
+      # are invisible to installs, so nobody can download a half-uploaded release
+      - name: Create Draft Release
         id: release  # capture the output of this step to get the release ID
-        uses: softprops/action-gh-release@v3
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
+          draft: true # flipped to published in the next step, once every zip is up
           name: CraftForm ${{ inputs.version || github.ref_name }} # set the release name
           tag_name: ${{ inputs.version || github.ref_name }} # set the tag name to the version tag
           target_commitish: ${{ github.sha }} # set the target commit for the release to the current commit that triggered the workflow
           generate_release_notes: true # let the action generate release notes based on merged PRs and commits
           fail_on_unmatched_files: true # fail if the files to upload are not found
+          # prereleases never count as "latest" -- and the stager downloads latest, so a test build
+          # can't leak into real installs. tag pushes have no inputs, so they're always false
+          prerelease: ${{ inputs.prerelease || false }}
           
           files: |
             startup.zip
             operations.zip
+            server.zip
             terraform.zip
-  
+
+      # PUBLISH RELEASE: every zip made it up (the step above fails otherwise), so make it public
+      - name: Publish Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api -X PATCH "repos/${{ github.repository }}/releases/${{ steps.release.outputs.id }}" -F draft=false
+

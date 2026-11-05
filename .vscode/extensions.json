@@ -15,7 +15,7 @@
 
     // ------------------------------- DIRENV ------------------------------
     // the one that actually matters. loads .envrc INTO vscode, so the integrated
-    // terminal and -- more importantly -- pylance both see the flake's python
+    // terminal and -- more importantly -- pylance both see .venv's python
     // instead of the system one. without it the editor can't find pynacl or the
     // boto3 stubs and underlines half the lambda code in red
     "mkhl.direnv",

@@ -2,7 +2,7 @@
 #║                              CraftForm                                       ║
 #╠══════════════════════════════════════════════════════════════════════════════╣
 #║  WORKFLOW  ::  ci-all.yaml                                                   ║
-#║  Preforms automated code checks on the code pushed into main branch          ║
+#║  Performs automated code checks on the code pushed into main branch          ║
 #║  Helps Lint, Security Check, and basic validation for all the code           ║
 #╚══════════════════════════════════════════════════════════════════════════════╝
 
@@ -44,13 +44,16 @@ jobs:
       - name: Checkout Repo
         uses: actions/checkout@v7
 
-      - name: Setup Python
-        uses: actions/setup-python@v7
+      - name: Setup uv + Python
+        uses: astral-sh/setup-uv@v10.3.3
         with:
-          python-version: "3.12"
+          python-version: "3.12"  # uv version comes from the root pyproject -- see lambda-ci.yaml
 
+      # cfn-lint is in uv.lock. --only-dev skips the packages' own deps
       - name: Install cfn-lint
-        run: pip install cfn-lint==1.43.3   # pinned to the flake
+        run: |
+          uv sync --locked --only-dev
+          echo "$GITHUB_WORKSPACE/.venv/bin" >> "$GITHUB_PATH"
 
       - name: Lint CloudFormation Templates
         run: cfn-lint ./cloudformation/*.yaml
@@ -131,15 +134,12 @@ jobs:
       - name: Checkout Repo
         uses: actions/checkout@v7
 
-      - name: Setup Python
-        uses: actions/setup-python@v7
+      - name: Setup uv + Python
+        uses: astral-sh/setup-uv@v10.3.3
         with:
-          python-version: "3.12"
+          python-version: "3.12"  # uv version comes from the root pyproject -- see lambda-ci.yaml
 
-      - name: Install Checkov
-        run: |
-          pip install checkov==3.3.9   # pinned to the flake
-      
+      # uvx runs checkov in its own throwaway env -- kept OUT of uv.lock, its deps are huge
       - name: Run Checkov IAC Check
         run: |
-          checkov --config-file .checkov.yaml
+          uvx checkov==3.3.9 --config-file .checkov.yaml   # pinned to the flake

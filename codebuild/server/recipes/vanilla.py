@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any, Self
 import urllib3
 from errors import BakeError
 
-# stub-only package -- pip'd for ci, NOT in codebuild, so it can only be imported for mypy
+# stub-only package -- in the uv dev group for ci, NOT in codebuild, so it can only be imported for mypy
 if TYPE_CHECKING:
     from mypy_boto3_ec2 import EC2Client
 

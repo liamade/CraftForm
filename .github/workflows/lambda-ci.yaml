@@ -2,7 +2,7 @@
 #║                              CraftForm                                       ║
 #╠══════════════════════════════════════════════════════════════════════════════╣
 #║  WORKFLOW  ::  lambda-ci.yaml                                                ║
-#║  Preforms automated code checks on the lambda python code                    ║
+#║  Performs automated code checks on the lambda python code                    ║
 #║  Acts as a child workflow to be called in other workflows                    ║
 #╚══════════════════════════════════════════════════════════════════════════════╝
 
@@ -44,15 +44,20 @@ jobs:
       - name: Checkout Repo
         uses: actions/checkout@v7
 
-      - name: Setup Python
-        uses: actions/setup-python@v7
+      # no `version:` on purpose -- setup-uv reads required-version from the root pyproject.toml,
+      # the ONE place the uv version lives (matches the flake's uv)
+      - name: Setup uv + Python
+        uses: astral-sh/setup-uv@v10.3.3
         with:
-          python-version: "3.12"
-      
-      # install everything needed for the ci from the requirements-dev.txt
+          python-version: "3.12"  # uv finds or downloads it
+
+      # install from uv.lock. --locked FAILS if the lock is stale instead of quietly fixing it.
+      # then put .venv/bin on PATH
       - name: Install Dependencies
+        working-directory: ${{ github.workspace }}   # repo root, where .venv lives
         run: |
-          pip install -r requirements-dev.txt   
+          uv sync --locked
+          echo "$GITHUB_WORKSPACE/.venv/bin" >> "$GITHUB_PATH"
 
       # checks formatting using ruff in read-only mode. fails if ruff would change anything
       - name: Check Formatting
@@ -69,4 +74,9 @@ jobs:
       # performs a basic security scan on all the python files and ignore low-level severity
       - name: Security Scan
         run: bandit -r . -ll
+
+      # runs the tests. exit code 5 = "found no tests" -- let that pass while packages are still
+      # getting their first tests. TODO: drop the `|| [ $? -eq 5 ]` once every package has one
+      - name: Tests
+        run: pytest || [ $? -eq 5 ]
 

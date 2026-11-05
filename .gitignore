@@ -7,19 +7,13 @@ __pycache__/
 *.pyd
 
 *.env
+# uv's venv -- `uv sync` rebuilds it from uv.lock
 .venv/
-venv/
-env/
 
 .pytest_cache/
 .mypy_cache/
 .coverage
 htmlcov/
-
-dist/
-build/
-*.egg-info/
-*.eggs
 
 # ==============================================================================
 # Ruff
@@ -64,8 +58,9 @@ terraform.rc
 # Lambda build artifacts
 # ==============================================================================
 *.zip
-package/
-lambda-build/   # the release workflow pip-installs deps into here before zipping
+# the release workflow installs deps into here before zipping. (comment on its own
+# line on purpose -- git only treats # as a comment at the START of a line)
+lambda-build/
 
 # ==============================================================================
 # Secrets & credentials
@@ -85,13 +80,7 @@ secrets.json
 # nix build output symlinks
 result
 result-*
-# the interpreter symlink `nix build .#python -o .python-env` drops. vscode
-# doesn't need it (direnv puts the shell on PATH and pylance follows), but
-# pycharm has no direnv and its sdk has to be an absolute path. doubles as a
-# gc root, so nix won't collect the interpreter the ide is pointed at :)
-.python-env
-# PLACEHOLDER COMMENT -- same idea for the tools pycharm pins by absolute path
-# (`nix build .#dev-tools -o .dev-env`); also a gc root
+# pycharm's tool symlink from `nix build .#dev-tools` -- also a gc root so nix won't delete it :)
 .dev-env
 # personal env overrides (AWS_PROFILE etc) that .envrc sources if present
 .envrc.local
@@ -106,8 +95,8 @@ result-*
 # same deal for pycharm -- share the module, the interpreter NAME and the
 # inspection profile; keep the personal half out (window layout, local history,
 # caches, the aws toolkit's active region). misc.xml and the .iml reference the
-# sdk by name, so each machine makes its own "CraftForm flake (Python 3.12)"
-# pointing at its own .python-env
+# sdk by name, so each machine makes its own "CraftForm (Python 3.12)"
+# pointing at its own .venv/bin/python
 #
 # runConfigurations/ is shared because the `ci` one is portable -- it's
 # $PROJECT_DIR$ plus `nix develop -c ci`, and nix is on PATH everywhere the

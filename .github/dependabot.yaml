@@ -2,27 +2,15 @@
 #║                              CraftForm                                       ║
 #╠══════════════════════════════════════════════════════════════════════════════╣
 #║  DEPENDABOT  ::  dependabot.yaml                                             ║
-#║  Preforms automated dependency and security checks                           ║
+#║  Performs automated dependency and security checks                           ║
 #║  Checks to make sure there aren't newer version for actions and dependenceies║
 #╚══════════════════════════════════════════════════════════════════════════════╝
 version: 2
 updates:
 
-  # scan the requirements.txt and dependencies for vulnerabilities or updates
-  - package-ecosystem: 'pip'
-    directory: "/lambda/startup"
-    schedule:
-      interval: 'weekly'
-
-  # scan the requirements.txt and dependencies for vulnerabilities or updates
-  - package-ecosystem: 'pip'
-    directory: '/lambda/operations'
-    schedule:
-      interval: 'weekly'
-
-  # scan the requirements.txt and dependencies for vulnerabilities or updates
-  - package-ecosystem: 'pip'
-    directory: '/codebuild/server'
+  # one entry covers everything -- the whole repo shares one uv.lock
+  - package-ecosystem: 'uv'
+    directory: '/'
     schedule:
       interval: 'weekly'
 

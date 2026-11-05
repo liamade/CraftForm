@@ -27,7 +27,7 @@ from errors import BakeError
 # ------------------------------------------------------------------------------------------
 from recipes.vanilla import Vanilla
 
-# stub-only packages -- pip'd for ci, NOT in codebuild, so they can only be imported for mypy
+# stub-only packages -- in the uv dev group for ci, NOT in codebuild, so they can only be imported for mypy
 if TYPE_CHECKING:
     from mypy_boto3_ec2 import EC2Client
     from mypy_boto3_ec2.type_defs import TagTypeDef
