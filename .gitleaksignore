@@ -2,44 +2,21 @@
 # ║                               CraftForm                                      ║
 # ╠══════════════════════════════════════════════════════════════════════════════╣
 # ║  SECURITY  ::  .gitleaksignore                                               ║
-# ║  Fingerprints gitleaks is told to shut up about. Read by BOTH the local      ║
-# ║  `ci` runner and the gitleaks action -- neither needs a flag, they both      ║
-# ║  pick this up from the repo root on their own.                               ║
-# ║                                                                              ║
-# ║  Format: <commit>:<path>:<rule>:<line>. It's a fingerprint, not a path       ║
-# ║  glob -- pinning the commit means a REAL secret landing in one of these      ║
-# ║  files later still gets caught, because it'd be a different commit :)        ║
+# ║  false alarms gitleaks should skip. ci and the local `ci` both read this     ║
+# ║  pinned to the commit, so a real secret in these files still gets caught :)  ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 # ==============================================================================
-# Vendored PyNaCl -- false positives
+# VENDORED PYNACL - false positives
 # ==============================================================================
-# back in may/june both lambdas had their dependencies committed straight into
-# the repo instead of being pip-installed at build time. that's long gone (the
-# release workflow builds them now) and the paths below don't exist any more,
-# but gitleaks scans HISTORY -- the blobs are still in the commits that added
-# them, so these 14 hits are permanent until the history itself is rewritten.
+# the generic-api-key rule getting scared of pynacl's variable names, not real secrets.
+# don't spell those lines out here or gitleaks flags this file again (it did :))))))))
 #
-# all 14 are gitleaks' `generic-api-key` rule firing on VARIABLE NAMES, not on
-# any value. that rule looks for words like passwd / secret / key / token sat
-# next to an assignment, and pynacl's source is full of them: the PASSWD_MIN
-# and PASSWD_MAX constants in its argon2 modules, curve_secret_key_len in
-# crypto_sign. what it reports as the "secret" is just the constant on the
-# other side of the assignment.
-#
-# NOTE: do not write those lines out in full here, keyword-then-equals and all.
-# the first version of this file did exactly that and the rule matched its own
-# explanation, which is what the three 260e617b fingerprints below are.
-# nothing was ever redacted here because there was never anything to redact :)
-#
-# see for yourself, no need to take my word for it:
-#     git show 8c1167b4:lambda/startup/nacl/pwhash/argon2i.py | sed -n '25,26p'
-#
-# regenerate the list with:
+# regenerate the list with
 #     gitleaks git . --report-format json --report-path /tmp/leaks.json
 #     jq -r '.[] | .Fingerprint' /tmp/leaks.json | sort
 
-# ---- lambda/startup  (8c1167b4, 2026-05-24) ----
+# LAMBDA/STARTUP (8c1167b4)
 8c1167b47f25d33f5f1447c8673a1de5d088109a:lambda/startup/nacl/bindings/crypto_sign.py:generic-api-key:150
 8c1167b47f25d33f5f1447c8673a1de5d088109a:lambda/startup/nacl/pwhash/__init__.py:generic-api-key:27
 8c1167b47f25d33f5f1447c8673a1de5d088109a:lambda/startup/nacl/pwhash/__init__.py:generic-api-key:28
@@ -48,7 +25,7 @@
 8c1167b47f25d33f5f1447c8673a1de5d088109a:lambda/startup/nacl/pwhash/argon2id.py:generic-api-key:25
 8c1167b47f25d33f5f1447c8673a1de5d088109a:lambda/startup/nacl/pwhash/argon2id.py:generic-api-key:26
 
-# ---- lambda/operations  (7f76991e, 2026-05-30) ----
+# LAMBDA/OPERATIONS (7f76991e)
 7f76991e743a51b45b0015f0a1cbba6c403eb788:lambda/operations/nacl/bindings/crypto_sign.py:generic-api-key:150
 7f76991e743a51b45b0015f0a1cbba6c403eb788:lambda/operations/nacl/pwhash/__init__.py:generic-api-key:27
 7f76991e743a51b45b0015f0a1cbba6c403eb788:lambda/operations/nacl/pwhash/__init__.py:generic-api-key:28
@@ -57,9 +34,7 @@
 7f76991e743a51b45b0015f0a1cbba6c403eb788:lambda/operations/nacl/pwhash/argon2id.py:generic-api-key:25
 7f76991e743a51b45b0015f0a1cbba6c403eb788:lambda/operations/nacl/pwhash/argon2id.py:generic-api-key:26
 
-# ---- this file's own first version  (260e617b, 2026-09-16) ----
-# the explanation block above used to spell the offending patterns out verbatim,
-# so the rule matched them. reworded now, but 260e617b keeps the original.
+# THIS FILE - its first version spelled the variable lines out and got flagged
 260e617b9f627e409e3f9488cf2ff9ca5e3c5c59:.gitleaksignore:generic-api-key:27
 260e617b9f627e409e3f9488cf2ff9ca5e3c5c59:.gitleaksignore:generic-api-key:28
 260e617b9f627e409e3f9488cf2ff9ca5e3c5c59:.gitleaksignore:generic-api-key:29
