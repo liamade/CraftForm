@@ -30,6 +30,8 @@ SUPPORTED: Final = frozenset(_CATALOG)
 # get the pretty name for the region code, or just return the code if it's not already
 # in the catalog (shouldn't happen but like yaknow a lot of things that shouldn't happen do)
 def label(code: str) -> str:
+    if code not in _CATALOG:
+        print(f"label() called with code: {code}, which isn't in the regions.json aka the catalog. returning the code as-is.")
     return _CATALOG.get(code, code)
 
 
