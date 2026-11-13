@@ -1,24 +1,22 @@
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║                               CraftForm                                      ║
+# ║                               CraftForm                                    ║
 # ╠══════════════════════════════════════════════════════════════════════════════╣
-# ║  STARTUP LAMBDA  ::  pyproject.toml                                          ║
-# ║  What this lambda needs at RUNTIME -- the stuff that ships in the zip.       ║
-# ║  Dev tools live in the root one.                                             ║
+# ║  STARTUP LAMBDA  ::  pyproject.toml                                        ║
+# ║  What this lambda needs to run (what ships in the zip).                    ║
+# ║  dev tools are in the root one                                             ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
-
-# how this connects to the root -- see the note in lambda/operations/pyproject.toml
 
 [project]
 name = "craftform-startup"
-version = "0.0.0"               # unused -- git tags version the releases
-requires-python = "==3.12.*"    # the lambda runtime, exactly
+version = "0.0.0"               # unused, git tags version the releases
+requires-python = "==3.12.*"    # the lambda runtime
 
-# floors, uv.lock pins them. NO boto3 on purpose -- lambda ships its own
+# minimum versions, uv.lock pins them. no boto3 because lambda ships its own
 dependencies = [
-  "urllib3>=2",       # the discord + cloudformation http calls
+  "urllib3>=2",       # discord and cloudformation http calls
 ]
 
-# just a zipped folder, not a package -- same as operations, see the note there
+# just a zipped folder, same as operations
 [tool.uv]
 package = false
 
@@ -26,7 +24,7 @@ package = false
 # ==========================================================================================
 #                                 PYTEST
 # ==========================================================================================
-# own folder = own pytest world -- see the note in lambda/operations/pyproject.toml
+# its own pytest, same as operations
 [tool.pytest]
 pythonpath = ["."]
 testpaths = ["tests"]

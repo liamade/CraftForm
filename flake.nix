@@ -1,47 +1,36 @@
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║                               CraftForm                                      ║
+# ║                               CraftForm                                    ║
 # ╠══════════════════════════════════════════════════════════════════════════════╣
-# ║  NIX  ::  flake.nix                                                          ║
-# ║  The dev shell -- every tool ci-all.yaml runs, and nothing installed         ║
-# ║  globally. flake.lock pins the exact versions, so the shell you get today    ║
-# ║  is the shell you get in six months :)                                       ║
-# ║                                                                              ║
-# ║  `direnv allow` once and it loads whenever you cd in. no direnv? then         ║
-# ║  `nix develop` gets you the identical shell by hand.                         ║
+# ║  NIX  ::  flake.nix                                                        ║
+# ║  The dev shell. every tool ci runs, pinned by flake.lock so it never drifts║
+# ║  `direnv allow` once and it loads on cd. no direnv? `nix develop` works too║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 {
   description = "CraftForm -- discord-driven minecraft server infrastructure";
 
   inputs = {
-    # unstable on purpose -- checkov/terraform move fast and stable lags behind
+    # unstable because checkov and terraform move fast and stable lags behind
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
   };
 
   outputs = { self, nixpkgs }:
     let
-      # linux for this box + actions, darwin so a mac can work on it too
+      # linux for this box and actions, darwin so a mac works too
       systems = [ "x86_64-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin" ];
 
-      # tiny stand-in for flake-utils -- not worth a second input for one function
+      # small flake-utils replacement, not worth another input for one function
       forAllSystems = f: nixpkgs.lib.genAttrs systems (system: f (import nixpkgs {
         inherit system;
 
         config = {
-          # terraform went BUSL back at 1.6, so nixpkgs flags it unfree and refuses
-          # to build it. allow that ONE package by name instead of flipping
-          # allowUnfree for the whole shell -- keeps the blast radius to the thing
-          # we actually need
+          # terraform is BUSL now so nixpkgs calls it unfree. only allow terraform
+          # instead of turning on allowUnfree for everything
           allowUnfreePredicate = pkg:
             builtins.elem (nixpkgs.lib.getName pkg) [ "terraform" ];
 
-          # checkov transitively pulls the pure-python ecdsa lib, which nixpkgs
-          # flags for CVE-2024-23342 -- the "Minerva" timing side-channel on ecdsa
-          # signing. checkov never signs anything, it reads our terraform and yaml
-          # off the disk, and nobody's positioned to time it. so: noise, for us.
-          #
-          # pinned to the EXACT version on purpose. when a nixpkgs bump moves it,
-          # this stops working and you get to re-read the paragraph above instead
-          # of silently inheriting whatever the new insecure package turns out to be
+          # checkov pulls in ecdsa, which nixpkgs flags for CVE-2024-23342 (a timing
+          # attack on signing). checkov never signs anything so it doesn't matter for us.
+          # pinned to the exact version so a nixpkgs bump makes you look at this again
           permittedInsecurePackages = [ "python3.14-ecdsa-0.19.2" ];
         };
       }));
@@ -50,12 +39,10 @@
       # ======================================================================
       #                          THE EDITOR TOOLS
       # ======================================================================
-      # pycharm has no direnv -- point its python at .venv/bin/python, uv keeps that path fresh
+      # pycharm has no direnv, so point its python at .venv/bin/python
       packages = forAllSystems (pkgs: {
 
-        # `nix build .#dev-tools -o .dev-env` once, then the ide points at
-        # .dev-env/bin/<tool> and a flake.lock bump just moves the symlink
-        # underneath it
+        # `nix build .#dev-tools -o .dev-env` once and point the ide at .dev-env/bin
         dev-tools = pkgs.symlinkJoin {
           name = "craftform-dev-tools";
           paths = [ pkgs.terraform ];
@@ -67,29 +54,27 @@
           # ====================================================================
           #                              PYTHON
           # ====================================================================
-          # BARE 3.12 -- no packages, uv.lock picks those. matches the lambda + codebuild runtimes
+          # plain 3.12 to match the lambda and codebuild runtimes. uv.lock handles the packages
           python = pkgs.python312;
 
           # ====================================================================
           #                            THE CI RUNNER
           # ====================================================================
-          # runs what .github/workflows/ci-all.yaml runs, in the same order, so you
-          # find out here instead of three minutes into a pushed run :)
+          # runs the same checks as ci-all.yaml so you find out before you push :)
           ci = pkgs.writeShellScriptBin "ci" ''
-            # deliberately NO -e -- every check should run even after one fails, so
-            # you get the whole picture in one go rather than one problem at a time
+            # no -e on purpose so every check runs even if one fails
             set -uo pipefail
 
             ROOT="$(git rev-parse --show-toplevel)" || exit 1
             FAILED=()
 
-            # sync the venv like ci does (--locked = fail if uv.lock is stale) and add it
-            # to PATH ourselves -- `nix develop -c ci` skips direnv
+            # sync like ci does (--locked fails on a stale uv.lock). add .venv to PATH
+            # ourselves because `nix develop -c ci` skips direnv
             ( cd "$ROOT" && uv sync --locked --quiet ) || exit 1
             PATH="$ROOT/.venv/bin:$PATH"
 
             step() {
-              # grab the label BEFORE the shift -- after it, $1 is the command
+              # save the label before shift moves it
               local label="$1"; shift
               printf '\n\033[1;34m==> %s\033[0m\n' "$label"
               if "$@"; then
@@ -103,7 +88,7 @@
             # ---- cloudformation ----
             cfn() { cfn-lint "$ROOT"/cloudformation/*.yaml; }
 
-            # ---- terraform ---- (subshells so the cd doesn't leak into the next step)
+            # ---- terraform ---- (subshells so the cd doesn't leak)
             tf_fmt()  { ( cd "$ROOT/terraform" && terraform fmt -check -recursive ); }
             tf_val()  { ( cd "$ROOT/terraform" \
                           && terraform init -backend=false -input=false >/dev/null \
@@ -112,11 +97,9 @@
                           && tflint --init >/dev/null \
                           && tflint --recursive --format compact ); }
 
-            # ---- the python ---- (matches the lambda-ci.yaml matrix)
-            # takes a path from the repo root, so non-lambda code like the bake fits too.
-            # within ONE package it stops at the first failure, same as the workflow does
-            # (fix the format diff, run again, then you'll see mypy etc).
-            # pytest exit 5 = "no tests yet" -- passes for now, same TODO as lambda-ci.yaml
+            # ---- python ---- (same as the lambda-ci.yaml matrix)
+            # stops at the first failure in a package like ci does.
+            # pytest exit 5 means no tests yet, so let it pass for now
             py() { ( cd "$ROOT/$1" \
                      && ruff format --diff . \
                      && ruff check . \
@@ -125,8 +108,7 @@
                      && { pytest || [ $? -eq 5 ]; } ); }
 
             # ---- security ----
-            # the action scans history, so we do too. `git` replaced `detect` in
-            # gitleaks 8.x -- fall back so an older binary still works
+            # gitleaks 8.x renamed detect to git, so fall back for older versions
             leaks() {
               if gitleaks git --help >/dev/null 2>&1; then
                 gitleaks git "$ROOT" --no-banner
@@ -164,51 +146,41 @@
               ci
 
               # ==================== IAC ====================
-              pkgs.terraform  # the region deploys -- buildspec.yaml pins its own copy
-              pkgs.tflint     # configured by terraform/.tflint.hcl
-              pkgs.checkov    # configured by .checkov.yaml
+              pkgs.terraform  # buildspec.yaml pins its own copy
+              pkgs.tflint     # config in terraform/.tflint.hcl
+              pkgs.checkov    # config in .checkov.yaml
 
               # ================= PYTHON TOOLING ==============
-              # uv is the ONLY python tool from nix -- everything else comes from uv.lock.
-              # required-version in the root pyproject.toml must match this -- bump them together
-              pkgs.uv         # 0.12.5 as of this flake.lock
+              # uv is the only python tool from nix, the rest comes from uv.lock.
+              # bump it with required-version in the root pyproject.toml
+              pkgs.uv         # 0.12.5 right now
 
               # ================ EDITOR SUPPORT ===============
-              # the vscode Nix IDE extension shells out to these -- it does syntax
-              # highlighting on its own, but completions/jump-to-def need a server.
-              # keeping them in the flake means anyone who opens the repo gets the
-              # same ones, instead of hunting for a matching global install :)
-              pkgs.nixd       # nix language server. actually EVALUATES, so `pkgs.<tab>`
-                              # completes against real nixpkgs instead of guessing
-              pkgs.nixfmt     # the official formatter (rfc-style)
+              # the vscode nix extension needs these for completions and jump to definition
+              pkgs.nixd       # nix language server
+              pkgs.nixfmt     # nix formatter
 
               # ================ EVERYTHING ELSE ==============
-              pkgs.gitleaks   # the secret scan ci runs on every push
-              pkgs.awscli2    # poking at the deployed stack by hand
+              pkgs.gitleaks   # the secret scan ci runs
+              pkgs.awscli2    # poking at the stack by hand
               pkgs.jq         # the buildspec builds its discord json with this
-              pkgs.zip        # the release workflow's zips, for testing them locally
+              pkgs.zip        # for testing the release zips locally
               pkgs.unzip
             ];
 
-            # use the flake's 3.12, never let uv download its own
+            # use the flake's 3.12 and never let uv download its own
             UV_PYTHON = "${python}/bin/python3.12";
             UV_PYTHON_DOWNLOADS = "never";
 
             shellHook = ''
-              # checkov and awscli2 are built against python 3.14, and mkShell helpfully
-              # stacks every one of their deps onto PYTHONPATH. our own tooling is 3.12,
-              # so cfn-lint would start up, find the 3.14 copy of `regex` first, and die
-              # importing a C extension built for the wrong ABI.
-              #
-              # nothing here actually wants PYTHONPATH: checkov/aws are wrapped binaries
-              # that set their own, and our packages live in .venv's own site-packages.
-              # so drop it and let each tool use its own :)
+              # checkov and awscli2 are built on python 3.14 and mkShell stacks their deps
+              # onto PYTHONPATH, which breaks our 3.12 tools (cfn-lint dies on the wrong
+              # build of regex). nothing here needs it so just drop it
               unset PYTHONPATH
 
-              # point uv at the repo root no matter where you run it. without this,
-              # `uv sync` from inside lambda/operations strips .venv down to JUST that
-              # package -- no ruff, no mypy. (adding a dep to one package is now
-              # `uv add --package craftform-operations <dep>`)
+              # always point uv at the repo root. otherwise `uv sync` inside a package strips
+              # .venv down to just that package and you lose ruff and mypy.
+              # to add a dep to one package run `uv add --package craftform-operations <dep>`
               export UV_PROJECT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 
               echo ""

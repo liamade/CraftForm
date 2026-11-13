@@ -1,27 +1,25 @@
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║                               CraftForm                                      ║
+# ║                               CraftForm                                    ║
 # ╠══════════════════════════════════════════════════════════════════════════════╣
-# ║  OPERATIONS LAMBDA  ::  pyproject.toml                                       ║
-# ║  What this lambda needs at RUNTIME -- the stuff that ships in the zip.       ║
-# ║  Dev tools live in the root one.                                             ║
+# ║  OPERATIONS LAMBDA  ::  pyproject.toml                                     ║
+# ║  What this lambda needs to run (what ships in the zip).                    ║
+# ║  dev tools are in the root one                                             ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
-# the root pyproject lists this folder as a workspace member -- this file doesn't point
-# back. there's no inheriting in pyproject, so name/version/python have to live here
+# pyproject doesn't inherit from the root, so name, version and python live here
 
 [project]
 name = "craftform-operations"
-version = "0.0.0"               # unused -- git tags version the releases
-requires-python = "==3.12.*"    # the lambda runtime, exactly
+version = "0.0.0"               # unused, git tags version the releases
+requires-python = "==3.12.*"    # the lambda runtime
 
-# floors, uv.lock pins them. NO boto3 on purpose -- lambda ships its own
+# minimum versions, uv.lock pins them. no boto3 because lambda ships its own
 dependencies = [
-  "pynacl>=1.6.2",    # verifies the ed25519 signature discord signs every interaction with
-  "urllib3>=2",       # the discord http calls
+  "pynacl>=1.6.2",    # checks discord's signature on every interaction
+  "urllib3>=2",       # discord http calls
 ]
 
-# this is just a folder that gets zipped, not an installable package -- uv installs
-# its deps and never tries to build it
+# just a folder that gets zipped, so uv installs the deps and never builds it
 [tool.uv]
 package = false
 
@@ -29,9 +27,8 @@ package = false
 # ==========================================================================================
 #                                 PYTEST
 # ==========================================================================================
-# lives HERE, not in the root, so pytest treats this folder as its own little world:
-#   pythonpath -- lets tests do `import responses` the same way the lambda code does
-#   and it keeps this lambda's index.py from clashing with startup's index.py
+# here and not in the root so each package gets its own pytest. pythonpath lets tests
+# import things the same way the lambda does, and keeps the two index.py files apart
 [tool.pytest]
 pythonpath = ["."]
 testpaths = ["tests"]

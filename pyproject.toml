@@ -1,35 +1,34 @@
 # ==========================================================================================
 #                                  UV WORKSPACE
 # ==========================================================================================
-# ties the three python packages into ONE uv.lock. each package lists its own runtime
-# deps, the dev tools live once down below. uv.lock has the exact version of everything
+# ties the three python packages into one uv.lock. runtime deps live in each package,
+# dev tools live here
 [tool.uv.workspace]
 members = [
-  "lambda/operations",    # craftform-operations -- the discord interactions lambda
-  "lambda/startup",       # craftform-startup    -- the cloudformation custom resource
-  "codebuild/server",     # craftform-server     -- the AMI bake codebuild runs
+  "lambda/operations",    # craftform-operations, the discord interactions lambda
+  "lambda/startup",       # craftform-startup, the cloudformation custom resource
+  "codebuild/server",     # craftform-server, the AMI bake
 ]
 
-# the ONE place the uv version lives. your local uv refuses to run if it doesn't match,
-# and setup-uv in every workflow installs exactly this. bump it with the flake's pkgs.uv
+# the one place the uv version lives. ci installs exactly this, bump it with pkgs.uv in flake.nix
 [tool.uv]
 required-version = "==0.12.5"
 
 # ------------------------------------------------------------------------------------------
 # DEV TOOLS
 # ------------------------------------------------------------------------------------------
-# floors -- uv.lock has the exact versions, dependabot bumps it.
-# boto3 lives HERE, not in the lambdas -- lambda already ships it, so zipping it is just bloat
+# minimum versions, uv.lock pins the real ones and dependabot bumps it.
+# boto3 is here and not in the lambdas because lambda already ships it
 [dependency-groups]
 dev = [
-  "ruff>=0.16.9",       # format + lint
+  "ruff>=0.16.9",       # format and lint
   "mypy>=2.4.0",        # type check
-  "bandit>=1.9.4",      # python security scan
-  "pytest>=9.1.1",      # the test runner
-  "cfn-lint>=1.43.3",   # the ci gate on cloudformation/*.yaml
-  "boto3>=1.43.114",    # the lambdas' runtime-provided boto3, for local tests
+  "bandit>=1.9.4",      # security scan
+  "pytest>=9.1.1",      # tests
+  "cfn-lint>=1.43.3",   # cloudformation lint
+  "boto3>=1.43.114",    # the boto3 lambda gives you, for local tests
 
-  # exactly the aws services the code talks to -- add one here when the code does
+  # only the aws services the code uses, add one when the code does
   "boto3-stubs[ec2,lambda,s3,ssm,secretsmanager,codebuild]>=1.43.114",
 ]
 
@@ -37,9 +36,7 @@ dev = [
 # ==========================================================================================
 #                              MYPY CONFIGURATION
 # ==========================================================================================
-# mypy walks up to this file from each package, same as ruff.
-# check_untyped_defs: check the INSIDE of functions even if they have no type hints --
-# mypy's default skips them completely, so bugs in there would never show up
+# check inside functions even without type hints (mypy skips them by default)
 [tool.mypy]
 check_untyped_defs = true
 
@@ -47,44 +44,28 @@ check_untyped_defs = true
 # ==========================================================================================
 #                              RUFF CONFIGURATION
 # ==========================================================================================
-# the ONE ruff config for the repo. every package inherits it -- ruff walks up from
-# whatever directory it's invoked in, so `cd lambda/operations && ruff check .`
-# (what ci and the lambda-ci workflow both do) lands here.
+# one ruff config for the whole repo. ruff walks up to it from any package
 
 [tool.ruff]
-line-length = 160   # change the threshold of characters per line
+line-length = 160   # max characters per line
 
 # ------------------------------------------------------------------------------------------
 # LINT
 # ------------------------------------------------------------------------------------------
-# `select` is deliberately LEFT AT THE DEFAULT. ruff's default set has grown over
-# time (0.16 lints a good deal more than the old E4/E7/E9/F), so what pins our
-# behaviour is the ruff VERSION pinned in uv.lock -- not a hand-maintained list
-# here that'd rot on its own.
+# select stays at the default on purpose. the ruff version in uv.lock decides what runs
 [tool.ruff.lint]
 
-# pep8-naming on top of the default set
+# pep8 naming on top of the defaults
 extend-select = ["N"]
 
-# rules turned off on purpose, with the reason. same spirit as the skip-check
-# list in .checkov.yaml -- a suppression with no reason next to it is a landmine
+# rules turned off on purpose, always with a reason
 ignore = [
-  # SIM114 wants `elif sub in ("stop", "delete", ...)` across the `pass` stubs in
-  # commands/server.py. those aren't duplicate branches, they're SCAFFOLDING --
-  # one labelled slot per subcommand, each waiting for its own body. merging them
-  # would collapse the exact structure the file is built around, and we'd have to
-  # unpick it again the moment /server stop gets implemented
+  # SIM114 wants to merge the `pass` stubs in commands/server.py. they're placeholders,
+  # one per subcommand, so they stay separate
   "SIM114",
 
-  # BLE001 flags the 4 `except Exception` handlers. every one of them is a
-  # deliberate outermost boundary that MUST NOT let anything escape:
-  #   startup/index.py            -- a custom resource that doesn't respond leaves
-  #                                  the whole cloudformation stack hanging ~1hr
-  #   operations/index.py         -- discord gets a 3s timeout, an unhandled
-  #                                  exception there is a dead-looking bot
-  #   commands/server.py, services/codebuild.py
-  #                               -- turn any aws-side failure into a message a
-  #                                  human reads in discord instead of a 500
-  # they all log the exception, so nothing's being swallowed silently
+  # BLE001 flags the `except Exception` handlers. they're all outer catches that can't
+  # let anything escape (a hung cloudformation stack, a dead looking bot, a 500 instead
+  # of a discord message) and they all log the error
   "BLE001",
 ]

@@ -1,26 +1,23 @@
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║                               CraftForm                                      ║
+# ║                               CraftForm                                    ║
 # ╠══════════════════════════════════════════════════════════════════════════════╣
-# ║  CODEBUILD  ::  pyproject.toml                                               ║
-# ║  What the AMI bake needs at RUNTIME inside codebuild.                        ║
-# ║  Dev tools live in the root one.                                             ║
+# ║  CODEBUILD  ::  pyproject.toml                                             ║
+# ║  What the AMI bake needs to run in codebuild. dev tools are in the root one║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
-# how this connects to the root -- see the note in lambda/operations/pyproject.toml
-
 [project]
-name = "craftform-server"       # matches the codebuild project + server.zip
-version = "0.0.0"               # unused -- git tags version the releases
-requires-python = "==3.12.*"    # buildspec.yaml's `python: 3.12`, exactly
+name = "craftform-server"       # matches the codebuild project and server.zip
+version = "0.0.0"               # unused, git tags version the releases
+requires-python = "==3.12.*"    # matches python 3.12 in buildspec.yaml
 
-# floors, uv.lock pins them. boto3 IS here -- codebuild doesn't promise one
-# (the stubs are dev-only, which is why bake.py hides them behind TYPE_CHECKING)
+# minimum versions, uv.lock pins them. boto3 IS here because codebuild doesn't come with one
+# (the stubs are dev only, that's why bake.py imports them under TYPE_CHECKING)
 dependencies = [
-  "boto3>=1.43.114",  # ec2 + ssm
-  "urllib3>=2",       # the discord followup webhook
+  "boto3>=1.43.114",  # ec2 and ssm
+  "urllib3>=2",       # discord followup webhook
 ]
 
-# just a zipped folder, not a package -- same as the lambdas, see the note in operations
+# just a zipped folder, same as the lambdas
 [tool.uv]
 package = false
 
@@ -28,7 +25,7 @@ package = false
 # ==========================================================================================
 #                                 PYTEST
 # ==========================================================================================
-# own folder = own pytest world -- see the note in lambda/operations/pyproject.toml
+# its own pytest, same as the lambdas
 [tool.pytest]
 pythonpath = ["."]
 testpaths = ["tests"]
