@@ -94,7 +94,7 @@ def test_drop_down_empty_options():
     test_content = "Test Drop Down"
     test_custom_id = "test_drop_down"
     test_placeholder = "Select an option"
-    test_drop_down_options = []
+    test_drop_down_options: list[dict[str, str]] = []
 
     response = drop_down(test_content, test_custom_id, test_placeholder, test_drop_down_options)
 
