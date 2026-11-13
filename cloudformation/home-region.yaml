@@ -46,9 +46,8 @@ Parameters:
 Resources:
 
 # ------------------------------------------IAM ROLES------------------------------------------
-  # REGION BUILD ROLE -- the role the region CodeBuild project runs terraform under.
-  # this is the exact same permission set the old github actions role carried, just handed to
-  # codebuild instead -- no OIDC provider, no federation, no long-lived keys anywhere :)
+  # REGION BUILD ROLE - the role the region codebuild runs terraform under.
+  # no OIDC, no federation, no long-lived keys anywhere :)
   CodeBuildRegionRole:
     Type: AWS::IAM::Role
     Properties:
@@ -79,9 +78,8 @@ Resources:
             Version: '2012-10-17'
             Statement:
               # ======================= provision =======================
-              # the create calls, plus the tag-on-create calls that ride along with them.
-              # these CAN'T be tag-scoped: a brand-new resource has no tags yet, so the
-              # "manage tagged stuff" statement below can't authorize its birth -- chicken n egg.
+              # the create calls and their tag-on-create buddies. can't be tag scoped because a brand
+              # new resource has no tags yet - chicken n egg
               - Sid: Provision
                 Effect: Allow
                 Action:
@@ -118,11 +116,8 @@ Resources:
                 Resource: '*'
 
               # ======================= read-only =======================
-              # every plan refreshes state by reading each resource back. tons of these are
-              # list/describe-style actions AWS only accepts on '*' (can't be tag- or arn-
-              # scoped), and freshly-made resources aren't tagged yet anyway. read-only so
-              # it's safe to allow broadly :)  -- this also covers reading the tf state object
-              # and listing the home bucket, so neither needs its own statement anymore.
+              # every plan reads each resource back and tons of these only work on '*'. it's all read-only
+              # so it's safe to allow broadly :) (also covers the tf state reads and listing the home bucket)
               - Sid: ReadOnly
                 Effect: Allow
                 Action:
@@ -135,9 +130,8 @@ Resources:
                 Resource: '*'
 
               # ======================= manage tagged resources =======================
-              # once a resource exists and carries Project=craftform, terraform can do
-              # anything to it (modify / destroy). this is the blast-radius guard -- the role
-              # can't touch a single thing that isn't ours.
+              # once a resource has Project=craftform terraform can do anything to it - the role can't
+              # touch a single thing that isn't ours
               - Sid: ManageTaggedResources
                 Effect: Allow
                 Action: '*'
@@ -147,9 +141,8 @@ Resources:
                     aws:ResourceTag/Project: craftform
 
               # ======================= terraform state backend =======================
-              # state lives as OBJECTS in the home bucket, and objects don't inherit the
-              # bucket's craftform tag -- so the tag statement can't reach them. the reads are
-              # already handled by ReadOnly above, so this just grants the writes.
+              # state lives as objects in the home bucket and objects don't get the bucket's tag, so this
+              # grants the writes (ReadOnly already has the reads)
               - Sid: TerraformState
                 Effect: Allow
                 Action:
@@ -158,34 +151,30 @@ Resources:
                 Resource: !Sub arn:aws:s3:::craftform-home-${AWS::AccountId}/regions/*
 
               # ======================= ssm params =======================
-              # write (and the rest of) the per-region config params terraform publishes.
-              # DescribeParameters is the one ssm read that needs '*', so it lives in ReadOnly.
+              # write the per-region config params terraform publishes (DescribeParameters needs '*' so it's in ReadOnly)
               - Sid: SsmParameters
                 Effect: Allow
                 Action: ssm:*
                 Resource: !Sub arn:aws:ssm:*:${AWS::AccountId}:parameter/craftform/*
 
               # ======================= delete world buckets =======================
-              # s3 bucket-level actions DON'T honor aws:ResourceTag, so ManageTaggedResources
-              # above can't authorize a bucket delete (it fails closed) -- gotta grant
-              # DeleteBucket explicitly, scoped by name to the per-region world buckets.
+              # s3 bucket actions don't honor aws:ResourceTag so the tag rule can't delete buckets - gotta
+              # grant DeleteBucket by name for the per-region world buckets
               - Sid: DeleteWorldBuckets
                 Effect: Allow
                 Action: s3:DeleteBucket
                 Resource: !Sub arn:aws:s3:::craftform-*-${AWS::AccountId}
 
               # ======================= protect the state bucket =======================
-              # the home bucket matches the glob above AND is tagged craftform, so it's
-              # technically in reach of the deletes -- nuking it would destroy our own tf
-              # state. explicit Deny beats every Allow, so this slams that door shut for good.
+              # the home bucket matches the glob above and is tagged too, and deleting it nukes our own tf
+              # state :( explicit Deny beats every Allow so this shuts that door for good
               - Sid: ProtectStateBucket
                 Effect: Deny
                 Action: s3:DeleteBucket
                 Resource: !Sub arn:aws:s3:::craftform-home-${AWS::AccountId}
 
               # ======================= build logs =======================
-              # github used to keep the logs for us -- now the build writes its own terraform
-              # output into cloudwatch, which is the only place to go digging when a run fails
+              # the build writes its terraform output to cloudwatch, that's where you go digging when a run fails
               - Sid: BuildLogs
                 Effect: Allow
                 Action:
@@ -194,14 +183,10 @@ Resources:
                   - logs:PutLogEvents
                 Resource: !Sub arn:aws:logs:*:${AWS::AccountId}:log-group:/aws/codebuild/craftform-*:*
 
-  # SERVER BUILD ROLE -- the role the server CodeBuild project bakes under.
-  # deliberately NOT the region role. that one can do anything tagged Project=craftform,
-  # and every player's running server carries that tag -- so a bad bake could reach a live
-  # world. this role can only touch things IT made, which is what Role=builder is for :)
-  #
-  # the bake writes the software onto a scratch EBS volume and snapshots THAT, instead of
-  # CreateImage-ing the builder. a ~1gb snapshot beats an 8gb root snapshot by a mile, and
-  # that wait is the whole reason create feels slow to the user.
+  # SERVER BUILD ROLE - the role the server codebuild bakes under. not the region role because
+  # that one can touch anything tagged Project=craftform, live servers included. this one only
+  # touches what it made (Role=builder) :)
+  # the bake snapshots a small scratch volume instead of the whole builder - ~1gb beats 8gb by a mile
   CodeBuildServerRole:
     Type: AWS::IAM::Role
     Properties:
@@ -232,11 +217,8 @@ Resources:
             Version: '2012-10-17'
             Statement:
               # ======================= read-only =======================
-              # DescribeImages is the cache check at the top of every bake ("do we already
-              # have this version?"), and the rest is just polling -- is the builder up, is
-              # the volume attached, is the snapshot done yet. ec2 describes ONLY accept '*'
-              # (no arn scoping, no tag scoping), and they're read-only, so this is the safe
-              # kind of broad :)
+              # DescribeImages is the cache check (do we already have this version?) and the rest is polling.
+              # ec2 describes only take '*' and they're read-only, so this is the safe kind of broad :)
               - Sid: ReadOnly
                 Effect: Allow
                 Action:
@@ -246,8 +228,7 @@ Resources:
                 Resource: '*'
 
               # ======================= the build's own source =======================
-              # codebuild pulls the zip itself, but it does it AS this role -- so without
-              # this the project can't even read its own buildspec :(
+              # codebuild pulls the zip as this role, so without this it can't even read its own buildspec :(
               - Sid: BuildSource
                 Effect: Allow
                 Action:
@@ -256,9 +237,8 @@ Resources:
                 Resource: !Sub arn:aws:s3:::craftform-home-${AWS::AccountId}/lambda-code/*
 
               # ======================= launch the builder =======================
-              # RunInstances touches a pile of resource types at once and only the INSTANCE
-              # and the volumes carry our request tags -- the image/subnet/sg arns can't, so
-              # conditioning the whole action fails closed. that's why it's split in two.
+              # RunInstances touches a bunch of resource types and only the instance and volumes get our tags,
+              # so one condition on everything fails closed - that's why it's split in two
               - Sid: LaunchBuilderPlumbing
                 Effect: Allow
                 Action: ec2:RunInstances
@@ -282,8 +262,7 @@ Resources:
                     aws:RequestTag/Role: builder
 
               # ======================= the scratch volume =======================
-              # the volume the software actually gets installed onto. same tag-at-birth deal
-              # as the builder -- untagged means unmanageable, so the bake can't skip it.
+              # the volume the software gets installed onto. same tag at birth deal as the builder
               - Sid: CreateScratchVolume
                 Effect: Allow
                 Action: ec2:CreateVolume
@@ -294,14 +273,9 @@ Resources:
                     aws:RequestTag/Role: builder
 
               # ======================= snapshot the scratch volume =======================
-              # this IS the artifact -- whether it ends up registered as an ami or just
-              # mounted as a data volume at launch, the snapshot is what survives the bake.
-              #
-              # CreateSnapshot authorizes against TWO resource types at once and they need
-              # opposite conditions: the snapshot is being born (RequestTag, from
-              # --tag-specifications) while the source volume already exists (ResourceTag).
-              # one shared condition would happen to work, but only by accident -- split so
-              # it's obvious which key is guarding what :)
+              # this is the artifact - the snapshot is what survives the bake, as an ami or a data volume.
+              # CreateSnapshot checks two resource types with opposite conditions (the new snapshot's RequestTag
+              # and the source volume's ResourceTag) so it's split up to make it obvious which is which
               - Sid: SnapshotScratchVolume
                 Effect: Allow
                 Action: ec2:CreateSnapshot
@@ -320,9 +294,8 @@ Resources:
                     aws:ResourceTag/Role: builder
 
               # ======================= tag on create =======================
-              # a brand-new resource has no tags yet, so nothing below can authorize its
-              # birth -- chicken n egg, same as the region role's Provision statement. the
-              # CreateAction condition is what stops this being "retag anything you like".
+              # new resources have no tags yet so nothing below can authorize them - chicken n egg again.
+              # the CreateAction condition stops this from turning into retag anything you like
               - Sid: TagOnCreate
                 Effect: Allow
                 Action: ec2:CreateTags
@@ -337,10 +310,8 @@ Resources:
                       - CreateImage
 
               # ======================= drive + wire up the builder =======================
-              # attach/detach need the permission to hold on BOTH the volume AND the
-              # instance, which is exactly why they share the one Role=builder tag.
-              # TerminateInstances is scoped the same way ON PURPOSE -- tagging on
-              # Project=craftform alone would let a runaway bake kill a live server :(
+              # attach and detach need the permission on both the volume and the instance, so they share
+              # Role=builder. terminate is scoped the same way or a runaway bake could kill a live server :(
               - Sid: ManageBuilder
                 Effect: Allow
                 Action:
@@ -358,10 +329,8 @@ Resources:
                     aws:ResourceTag/Role: builder
 
               # ======================= publish the image =======================
-              # RegisterImage turns the finished snapshot into a launchable ami, and
-              # DeregisterImage/DeleteSnapshot are the garbage collection -- a rebake of a
-              # version we already have needs to clear out the old one, or the account
-              # slowly fills up with stale amis nobody launches
+              # RegisterImage turns the snapshot into an ami and the deregister and delete are the cleanup -
+              # otherwise the account slowly fills up with stale amis nobody launches
               - Sid: PublishImage
                 Effect: Allow
                 Action:
@@ -398,10 +367,8 @@ Resources:
                     aws:ResourceTag/Project: craftform
 
               # ======================= let the builder be a server =======================
-              # the builder runs under the region's own instance profile rather than a new
-              # role of its own -- it already carries AmazonSSMManagedInstanceCore, which is
-              # what makes SendCommand below work, plus s3 to the world bucket. PassedToService
-              # pins it so this can't be used to hand that role to anything but ec2.
+              # the builder uses the region's instance profile since it already has ssm core (for SendCommand)
+              # and s3 to the world bucket. PassedToService makes sure it only gets passed to ec2
               - Sid: PassServerProfile
                 Effect: Allow
                 Action: iam:PassRole
@@ -411,10 +378,8 @@ Resources:
                     iam:PassedToService: ec2.amazonaws.com
 
               # ======================= run the install =======================
-              # SendCommand over ssm instead of stuffing the install into userdata -- userdata
-              # runs once, silently, and you find out it failed by noticing the bake produced
-              # nothing. this way the build watches the exit code and the output lands in the
-              # build log where you can actually read it :)
+              # SendCommand over ssm instead of userdata - userdata fails silently and you only find out when
+              # the bake makes nothing. this way the exit code and output land in the build log :)
               - Sid: DriveBuilder
                 Effect: Allow
                 Action: ssm:SendCommand
@@ -455,9 +420,8 @@ Resources:
                 Resource: !Sub arn:aws:ssm:*:${AWS::AccountId}:parameter/craftform/*
 
               # ======================= the discord fallback =======================
-              # the interaction token in DISCORD_TOKEN dies 15 minutes after the user hit
-              # submit, and a cold bake can absolutely outrun that. when the followup 404s
-              # the bot token is the only way left to tell them it worked :)
+              # the interaction token dies 15 minutes after submit and a cold bake can outrun that. when the
+              # followup 404s the bot token is the only way left to tell them it worked :)
               - Sid: SecretsRead
                 Effect: Allow
                 Action: secretsmanager:GetSecretValue
@@ -528,10 +492,8 @@ Resources:
                 Resource: !Sub arn:aws:secretsmanager:*:${AWS::AccountId}:secret:craftform-secrets-*
 
               # ---- the slash commands kick off the long-running builds ----
-              # arn is written out by hand instead of !GetAtt so this role doesn't depend on the
-              # project resources. wildcarded on craftform-* so /region hits craftform-region and
-              # /server hits craftform-server without needing another policy edit -- same trick
-              # the log-group statement above already uses :)
+              # arn written out by hand instead of !GetAtt so this role doesn't depend on the projects.
+              # craftform-* covers both craftform-region and craftform-server :)
               - Sid: StartCraftFormBuilds
                 Effect: Allow
                 Action: codebuild:StartBuild
@@ -912,9 +874,8 @@ Resources:
       Principal: apigateway.amazonaws.com # who is allowed to do the action - API Gateway service
       SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${DiscordApiGateway}/*/* # only allow this specific API Gateway to invoke
   # ------------------------------------------CODE BUILD-----------------------------------------
-  # REGION CODEBUILD PROJECT - runs terraform to deploy/tear down region infrastructure.
-  # the server bake gets its OWN project (craftform-server) -- different tooling, different
-  # iam, and a server build shouldn't sit in queue behind a region deploy :)
+  # REGION CODEBUILD PROJECT - runs terraform to deploy or tear down a region. the server bake
+  # gets its own project (craftform-server) so it never waits in line behind a region deploy :)
   CodeBuildRegion:
     Type: AWS::CodeBuild::Project
     DependsOn:
@@ -1062,8 +1023,8 @@ Resources:
               bucket = os.environ['Bucket']  # the home craftform bucket
 
               # ---------------------------LATEST RELEASE CODE---------------------------
-              # pulls all three assets -- both lambda zips AND the terraform source, so a
-              # region deploy after an /update runs the new terraform too :)
+              # pulls all three assets - both lambda zips and the terraform source, so a region
+              # deploy after an /update runs the new terraform too :)
               stage_assets(bucket, 'latest') # calls the original stage_assets function with just the latest
 
               # UPDATE THE LAMBDA -- update the current lambdas with the new code that got pulled
@@ -1198,10 +1159,8 @@ Resources:
       - DiscordApiGatewayStage
       - DiscordApiGatewayPermission
       - OperationFunction
-      # setting the endpoint makes discord immediately PING it, and the operation function reads
-      # the public key out of ssm to verify that ping -- so the param HAS to exist first. nothing
-      # references it, so without this cloudformation is free to build it in parallel and we lose
-      # the race on some deploys and not others :(
+      # setting the endpoint makes discord PING it right away and the operations lambda needs the
+      # public key from ssm to answer, so the param has to exist first or we lose the race :(
       - DiscordPublicKeyParameter
     Properties:
       ServiceToken: !GetAtt StartUpFunction.Arn # run this function after the stack is created

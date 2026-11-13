@@ -57,15 +57,15 @@ def get_dict(name: str) -> dict[str, Any]:
 #   bucket_name       the world-data bucket for this region
 #   security_group    the minecraft SG (25565 open)
 #   instance_profile  the role the ec2 servers assume
-#   subnet_ids        {az: subnet_id} -- pick one to launch into
+#   subnet_ids        {az: subnet_id} - pick one to launch into
 def region_config(region: str) -> dict[str, Any]:
     return get_dict(f"/craftform/regions/{region}/config")
 
 
 # ====================================PUT A JSON DICT====================================
-# overwrite=False is the CREATE guard -- ssm rejects a name that's already taken, and it's
-# atomic, so no check-then-write race. returns True if it wrote, False if the name was
-# taken. we swallow the exception because callers import this MODULE, not the raw client :)
+# overwrite=False is the create guard - ssm rejects a name that's already taken and it's atomic,
+# so no check-then-write race. True if it wrote, False if the name was taken. we swallow the
+# error so callers never have to touch the raw client :)
 def put_dict(name: str, data: Mapping[str, object], overwrite: bool = True) -> bool:
     try:
         ssm.put_parameter(

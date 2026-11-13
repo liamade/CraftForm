@@ -143,10 +143,8 @@ jobs:
             zip -r ../terraform.zip . -x '.terraform/*' '*.tfstate*'
           )
 
-          # BUILDSPEC -- has to sit at the ROOT of the zip, that's where codebuild reads it from.
-          # -j drops the path so it lands next to main.tf instead of in a subdir.
-          # NOTE: codebuild only auto-finds "buildspec.yml", so since ours is .yaml to match the
-          # rest of the repo, the project has to name it explicitly -> BuildSpec: buildspec.yaml
+          # BUILDSPEC - has to sit at the root of the zip, that's where codebuild looks. -j drops the path.
+          # codebuild only auto-finds buildspec.yml so the project names our .yaml one explicitly
           zip -j terraform.zip codebuild/region/buildspec.yaml
 
           # SANITY CHECK -- if the buildspec didn't make it in, every region deploy is dead, so

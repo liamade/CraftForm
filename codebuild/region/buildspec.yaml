@@ -15,18 +15,18 @@ version: 0.2   # the buildspec format version, not ours
 #============================================================
 #                 VARIABLE SETTINGS
 #============================================================
-# BAKED IN -- right here, same every run
+# BAKED IN - right here, same every run
 #   TF_VERSION        the terraform version to install
 #
-# SET ON THE PROJECT -- cloudformation writes these once
+# SET ON THE PROJECT - cloudformation writes these once
 #   HOME_REGION       control-plane region (where state + ssm live)
 #   STATE_BUCKET      the home bucket holding the terraform state
 #
-# INJECTED PER RUN -- the operations lambda passes these to start_build
-#   DEPLOY_REGION     the region we're building INTO
+# INJECTED PER RUN - the operations lambda passes these in
+#   DEPLOY_REGION     the region we're building into
 #   TF_ACTION         create or destroy
 #   DISCORD_APP_ID    the bot id, for the followup webhook
-#   DISCORD_TOKEN     the interaction token, so we edit the RIGHT message
+#   DISCORD_TOKEN     the interaction token, so we edit the right message
 
 env:
   variables:
@@ -36,9 +36,8 @@ env:
 #============================================================
 #                 BUILD EXECUTION
 #============================================================
-# runs in order: install -> build -> post_build.
-# if install or build dies it jumps STRAIGHT to post_build -- that's the only
-# reason the discord reporting works when terraform fails :)
+# runs install -> build -> post_build. if install or build dies it jumps straight to
+# post_build, that's the only reason the discord report works when terraform fails :)
 
 phases:
 
@@ -77,25 +76,22 @@ phases:
  # ----------------------------------------------------------
  #                      TERRAFORM
  # ----------------------------------------------------------
- # codebuild already unzipped terraform.zip and dropped us inside it, so main.tf
- # is sitting right here -- no checkout and no cd needed :)
- #
- # HEADS UP: every command below gets its OWN shell, so `cd` and `export` don't
- # carry over. anything sharing state has to live in one `- |` block. the
- # filesystem does persist though, which is how tfplan survives to the apply
+ # codebuild already unzipped terraform.zip and dropped us in it, so main.tf is right here :)
+ # HEADS UP - every command gets its own shell so cd and export don't carry over. anything sharing
+ # state goes in one `- |` block (files do stick around, that's how tfplan makes it to the apply)
   build:
     commands:
 
     # =========================TERRAFORM INIT=========================
-    # the backend block in terraform.tf is left EMPTY on purpose, so these get injected per
-    # run -- that's how one set of terraform code manages every region off its own state file
+    # the backend block in terraform.tf is empty so these get injected per run - that's how one
+    # set of terraform code manages every region with its own state file
     - |
       terraform init -input=false -no-color -lock-timeout=60s \
         -backend-config="bucket=${STATE_BUCKET}" \
         -backend-config="key=regions/${DEPLOY_REGION}/terraform.tfstate" \
         -backend-config="region=${HOME_REGION}"
       # -input=false never prompt (nobody's here) | -no-color ANSI is garbage in cloudwatch
-      # -lock-timeout wait a min for the state lock instead of dying -- two /region's back to back
+      # -lock-timeout wait a min for the state lock instead of dying - two /region's back to back
       # bucket = state storage | key = per-region object path | region = where the bucket lives
 
     # =========================TERRAFORM PLAN=========================
@@ -105,8 +101,8 @@ phases:
       terraform plan $FLAG -out=tfplan -input=false -no-color \
         -var="region=${DEPLOY_REGION}" \
         -var="home_region=${HOME_REGION}"
-      # $FLAG UNQUOTED on purpose -- quoted, an empty one becomes an empty arg and terraform chokes
-      # -out saves the plan so apply does EXACTLY this, no re-deciding
+      # $FLAG is unquoted because an empty quoted one turns into an empty arg and terraform chokes
+      # -out saves the plan so apply does exactly this, no re-deciding
       # -var passed straight in, since exports don't survive to the next command
 
     # ========================TERRAFORM APPLY=========================

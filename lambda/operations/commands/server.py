@@ -234,11 +234,10 @@ def create_args(options: list[dict[str, Any]]) -> tuple[str, dict[str, Any]]:
 # ==========================================================================================
 #                                    AUTOCOMPLETE
 # ==========================================================================================
-# fires on EVERY keystroke, so keep it to one ssm list and out. blowing the 3s here just
-# stops suggestions appearing rather than erroring visibly.
-#
-# variant-blind on purpose -- vanilla/modpack/custom all get region suggestions from the
-# same branch, so a new variant needs the option REGISTERED, not code in here :)
+# fires on every keystroke so keep it to one ssm list and out. blowing the 3s here just stops
+# suggestions showing up instead of erroring.
+# every variant gets region suggestions from the same branch, so a new variant just needs the
+# option registered, no code in here :)
 # ------------------------------------------------------------------------------------------
 def autocomplete(options: list[dict[str, Any]]) -> responses.ApiResponse:
 

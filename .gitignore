@@ -7,7 +7,7 @@ __pycache__/
 *.pyd
 
 *.env
-# uv's venv -- `uv sync` rebuilds it from uv.lock
+# uv's venv - `uv sync` rebuilds it from uv.lock
 .venv/
 
 .pytest_cache/
@@ -25,7 +25,7 @@ htmlcov/
 # ==============================================================================
 .terraform/
 
-# State files contain sensitive infrastructure details — never commit
+# state files have sensitive infra details so never commit these
 *.tfstate
 *.tfstate.backup
 
@@ -58,8 +58,8 @@ terraform.rc
 # Lambda build artifacts
 # ==============================================================================
 *.zip
-# the release workflow installs deps into here before zipping. (comment on its own
-# line on purpose -- git only treats # as a comment at the START of a line)
+# the release workflow installs deps in here before zipping (this comment has to sit on
+# its own line, git only reads # at the start of one)
 lambda-build/
 
 # ==============================================================================
@@ -75,12 +75,12 @@ secrets.json
 # ==============================================================================
 # Nix / direnv
 # ==============================================================================
-# the cached dev shell direnv builds -- big, machine-specific, regenerated on demand
+# the cached dev shell direnv builds - big and machine specific
 .direnv/
 # nix build output symlinks
 result
 result-*
-# pycharm's tool symlink from `nix build .#dev-tools` -- also a gc root so nix won't delete it :)
+# pycharm's tool symlink from `nix build .#dev-tools` - also a gc root so nix won't delete it :)
 .dev-env
 # personal env overrides (AWS_PROFILE etc) that .envrc sources if present
 .envrc.local
@@ -92,17 +92,8 @@ result-*
 .vscode/*
 !.vscode/settings.json
 !.vscode/extensions.json
-# same deal for pycharm -- share the module, the interpreter NAME and the
-# inspection profile; keep the personal half out (window layout, local history,
-# caches, the aws toolkit's active region). misc.xml and the .iml reference the
-# sdk by name, so each machine makes its own "CraftForm (Python 3.12)"
-# pointing at its own .venv/bin/python
-#
-# runConfigurations/ is shared because the `ci` one is portable -- it's
-# $PROJECT_DIR$ plus `nix develop -c ci`, and nix is on PATH everywhere the
-# flake is. ruff.xml and terraform.xml are NOT shared: they hold absolute
-# /nix/store paths for this machine's ruff and terraform, which nobody else's
-# lock resolves to
+# same deal for pycharm - share the project setup and keep the personal stuff out (layout,
+# history, caches). ruff.xml and terraform.xml stay out since they point at this machine's /nix/store
 .idea/*
 !.idea/CraftForm.iml
 !.idea/misc.xml
