@@ -1,8 +1,9 @@
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║                               CraftForm                                    ║
+# ║                               CraftForm                                      ║
 # ╠══════════════════════════════════════════════════════════════════════════════╣
-# ║  CODEBUILD  ::  pyproject.toml                                             ║
-# ║  What the AMI bake needs to run in codebuild. dev tools are in the root one║
+# ║  CODEBUILD  ::  pyproject.toml                                               ║
+# ║  What the AMI bake needs to run in codebuild.                                ║
+# ║  dev tools live in the root one                                              ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 [project]
@@ -10,11 +11,11 @@ name = "craftform-server"       # matches the codebuild project and server.zip
 version = "0.0.0"               # unused, git tags version the releases
 requires-python = "==3.12.*"    # matches python 3.12 in buildspec.yaml
 
-# minimum versions, uv.lock pins them. boto3 IS here because codebuild doesn't come with one
-# (the stubs are dev only, that's why bake.py imports them under TYPE_CHECKING)
+# minimum versions, uv.lock pins them. boto3 actually lives here because codebuild doesn't give us one
+# (the stubs are dev only, that's why bake.py hides them behind TYPE_CHECKING)
 dependencies = [
   "boto3>=1.43.114",  # ec2 and ssm
-  "urllib3>=2",       # discord followup webhook
+  "urllib3>=2",       # the discord followup webhook
 ]
 
 # just a zipped folder, same as the lambdas
@@ -25,7 +26,7 @@ package = false
 # ==========================================================================================
 #                                 PYTEST
 # ==========================================================================================
-# its own pytest, same as the lambdas
+# its own pytest, same deal as the lambdas
 [tool.pytest]
 pythonpath = ["."]
 testpaths = ["tests"]

@@ -1,8 +1,8 @@
 # ==========================================================================================
 #                                  UV WORKSPACE
 # ==========================================================================================
-# ties the three python packages into one uv.lock. runtime deps live in each package,
-# dev tools live here
+# ties all three python packages into one uv.lock. each package has its own runtime deps
+# and the dev tools just live here
 [tool.uv.workspace]
 members = [
   "lambda/operations",    # craftform-operations, the discord interactions lambda
@@ -10,7 +10,8 @@ members = [
   "codebuild/server",     # craftform-server, the AMI bake
 ]
 
-# the one place the uv version lives. ci installs exactly this, bump it with pkgs.uv in flake.nix
+# the one place the uv version lives. ci installs exactly this and your uv won't run if it
+# doesn't match - bump it with pkgs.uv in flake.nix
 [tool.uv]
 required-version = "==0.12.5"
 
@@ -18,7 +19,7 @@ required-version = "==0.12.5"
 # DEV TOOLS
 # ------------------------------------------------------------------------------------------
 # minimum versions, uv.lock pins the real ones and dependabot bumps it.
-# boto3 is here and not in the lambdas because lambda already ships it
+# boto3 lives here and not in the lambdas because lambda already ships it, no point zipping it twice
 [dependency-groups]
 dev = [
   "ruff>=0.16.9",       # format and lint
@@ -26,9 +27,9 @@ dev = [
   "bandit>=1.9.4",      # security scan
   "pytest>=9.1.1",      # tests
   "cfn-lint>=1.43.3",   # cloudformation lint
-  "boto3>=1.43.114",    # the boto3 lambda gives you, for local tests
+  "boto3>=1.43.114",    # the boto3 lambda gives us, for local tests
 
-  # only the aws services the code uses, add one when the code does
+  # just the aws services the code actually uses - add one when the code does
   "boto3-stubs[ec2,lambda,s3,ssm,secretsmanager,codebuild]>=1.43.114",
 ]
 
@@ -36,7 +37,8 @@ dev = [
 # ==========================================================================================
 #                              MYPY CONFIGURATION
 # ==========================================================================================
-# check inside functions even without type hints (mypy skips them by default)
+# check inside functions even if they don't have type hints. mypy skips them by default
+# and that's how bugs hide
 [tool.mypy]
 check_untyped_defs = true
 
@@ -44,7 +46,7 @@ check_untyped_defs = true
 # ==========================================================================================
 #                              RUFF CONFIGURATION
 # ==========================================================================================
-# one ruff config for the whole repo. ruff walks up to it from any package
+# one ruff config for the whole repo - ruff walks up to it from whatever package you run it in
 
 [tool.ruff]
 line-length = 160   # max characters per line
@@ -52,19 +54,20 @@ line-length = 160   # max characters per line
 # ------------------------------------------------------------------------------------------
 # LINT
 # ------------------------------------------------------------------------------------------
-# select stays at the default on purpose. the ruff version in uv.lock decides what runs
+# select stays at the default. the ruff version in uv.lock decides what runs so we don't
+# have to babysit a list
 [tool.ruff.lint]
 
 # pep8 naming on top of the defaults
 extend-select = ["N"]
 
-# rules turned off on purpose, always with a reason
+# rules we turned off, always with a reason or it's a landmine
 ignore = [
   # SIM114 wants to merge the `pass` stubs in commands/server.py. they're placeholders,
-  # one per subcommand, so they stay separate
+  # one per subcommand, so they gotta stay separate
   "SIM114",
 
-  # BLE001 flags the `except Exception` handlers. they're all outer catches that can't
+  # BLE001 is mad about the `except Exception` handlers. they're all outer catches that can't
   # let anything escape (a hung cloudformation stack, a dead looking bot, a 500 instead
   # of a discord message) and they all log the error
   "BLE001",

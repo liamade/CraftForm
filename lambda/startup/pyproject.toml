@@ -1,9 +1,9 @@
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║                               CraftForm                                    ║
+# ║                               CraftForm                                      ║
 # ╠══════════════════════════════════════════════════════════════════════════════╣
-# ║  STARTUP LAMBDA  ::  pyproject.toml                                        ║
-# ║  What this lambda needs to run (what ships in the zip).                    ║
-# ║  dev tools are in the root one                                             ║
+# ║  STARTUP LAMBDA  ::  pyproject.toml                                          ║
+# ║  What this lambda needs to run (the stuff that ships in the zip).            ║
+# ║  dev tools live in the root one                                              ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 [project]
@@ -11,9 +11,9 @@ name = "craftform-startup"
 version = "0.0.0"               # unused, git tags version the releases
 requires-python = "==3.12.*"    # the lambda runtime
 
-# minimum versions, uv.lock pins them. no boto3 because lambda ships its own
+# minimum versions, uv.lock pins them. no boto3 because lambda already ships it
 dependencies = [
-  "urllib3>=2",       # discord and cloudformation http calls
+  "urllib3>=2",       # the discord and cloudformation http calls
 ]
 
 # just a zipped folder, same as operations
@@ -24,7 +24,7 @@ package = false
 # ==========================================================================================
 #                                 PYTEST
 # ==========================================================================================
-# its own pytest, same as operations
+# its own pytest, same deal as operations
 [tool.pytest]
 pythonpath = ["."]
 testpaths = ["tests"]

@@ -1,36 +1,36 @@
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║                               CraftForm                                    ║
+# ║                               CraftForm                                      ║
 # ╠══════════════════════════════════════════════════════════════════════════════╣
-# ║  NIX  ::  flake.nix                                                        ║
-# ║  The dev shell. every tool ci runs, pinned by flake.lock so it never drifts║
-# ║  `direnv allow` once and it loads on cd. no direnv? `nix develop` works too║
+# ║  NIX  ::  flake.nix                                                          ║
+# ║  The dev shell - every tool ci runs, pinned by flake.lock so it never drifts ║
+# ║  `direnv allow` once and it just loads on cd. no direnv? `nix develop` :)    ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 {
   description = "CraftForm -- discord-driven minecraft server infrastructure";
 
   inputs = {
-    # unstable because checkov and terraform move fast and stable lags behind
+    # unstable because checkov and terraform move fast and stable just can't keep up
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
   };
 
   outputs = { self, nixpkgs }:
     let
-      # linux for this box and actions, darwin so a mac works too
+      # linux for my box and actions, darwin so mac people can join in too
       systems = [ "x86_64-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin" ];
 
-      # small flake-utils replacement, not worth another input for one function
+      # a tiny flake-utils so we don't need a whole other input for one function
       forAllSystems = f: nixpkgs.lib.genAttrs systems (system: f (import nixpkgs {
         inherit system;
 
         config = {
-          # terraform is BUSL now so nixpkgs calls it unfree. only allow terraform
-          # instead of turning on allowUnfree for everything
+          # terraform went BUSL so nixpkgs calls it unfree and won't build it - we only let
+          # terraform through instead of allowing every unfree thing
           allowUnfreePredicate = pkg:
             builtins.elem (nixpkgs.lib.getName pkg) [ "terraform" ];
 
-          # checkov pulls in ecdsa, which nixpkgs flags for CVE-2024-23342 (a timing
-          # attack on signing). checkov never signs anything so it doesn't matter for us.
-          # pinned to the exact version so a nixpkgs bump makes you look at this again
+          # checkov pulls in ecdsa and nixpkgs is scared of CVE-2024-23342 (a timing attack
+          # on signing). checkov never signs anything so we're good.
+          # pinned to the exact version so a nixpkgs bump breaks this and makes me look again
           permittedInsecurePackages = [ "python3.14-ecdsa-0.19.2" ];
         };
       }));
@@ -39,10 +39,10 @@
       # ======================================================================
       #                          THE EDITOR TOOLS
       # ======================================================================
-      # pycharm has no direnv, so point its python at .venv/bin/python
+      # pycharm doesn't do direnv so just point it at .venv/bin/python
       packages = forAllSystems (pkgs: {
 
-        # `nix build .#dev-tools -o .dev-env` once and point the ide at .dev-env/bin
+        # run `nix build .#dev-tools -o .dev-env` once and point the ide at .dev-env/bin
         dev-tools = pkgs.symlinkJoin {
           name = "craftform-dev-tools";
           paths = [ pkgs.terraform ];
@@ -54,27 +54,27 @@
           # ====================================================================
           #                              PYTHON
           # ====================================================================
-          # plain 3.12 to match the lambda and codebuild runtimes. uv.lock handles the packages
+          # just plain 3.12 to match lambda and codebuild - uv.lock handles the packages
           python = pkgs.python312;
 
           # ====================================================================
           #                            THE CI RUNNER
           # ====================================================================
-          # runs the same checks as ci-all.yaml so you find out before you push :)
+          # runs the same checks as ci-all.yaml so you find out here instead of three minutes into a pushed run :)
           ci = pkgs.writeShellScriptBin "ci" ''
-            # no -e on purpose so every check runs even if one fails
+            # no -e so every check still runs even if one fails and you get the whole picture
             set -uo pipefail
 
             ROOT="$(git rev-parse --show-toplevel)" || exit 1
             FAILED=()
 
-            # sync like ci does (--locked fails on a stale uv.lock). add .venv to PATH
-            # ourselves because `nix develop -c ci` skips direnv
+            # sync the venv like ci does (--locked fails if uv.lock is stale) and add it to PATH
+            # ourselves since `nix develop -c ci` skips direnv
             ( cd "$ROOT" && uv sync --locked --quiet ) || exit 1
             PATH="$ROOT/.venv/bin:$PATH"
 
             step() {
-              # save the label before shift moves it
+              # grab the label before shift eats it
               local label="$1"; shift
               printf '\n\033[1;34m==> %s\033[0m\n' "$label"
               if "$@"; then
@@ -85,10 +85,10 @@
               fi
             }
 
-            # ---- cloudformation ----
+            # CLOUDFORMATION
             cfn() { cfn-lint "$ROOT"/cloudformation/*.yaml; }
 
-            # ---- terraform ---- (subshells so the cd doesn't leak)
+            # TERRAFORM - subshells so the cd doesn't leak into the next step
             tf_fmt()  { ( cd "$ROOT/terraform" && terraform fmt -check -recursive ); }
             tf_val()  { ( cd "$ROOT/terraform" \
                           && terraform init -backend=false -input=false >/dev/null \
@@ -97,9 +97,9 @@
                           && tflint --init >/dev/null \
                           && tflint --recursive --format compact ); }
 
-            # ---- python ---- (same as the lambda-ci.yaml matrix)
+            # PYTHON - same as the lambda-ci.yaml matrix
             # stops at the first failure in a package like ci does.
-            # pytest exit 5 means no tests yet, so let it pass for now
+            # pytest exit 5 means there's no tests yet so just let it pass for now
             py() { ( cd "$ROOT/$1" \
                      && ruff format --diff . \
                      && ruff check . \
@@ -107,8 +107,7 @@
                      && bandit -r . -ll \
                      && { pytest || [ $? -eq 5 ]; } ); }
 
-            # ---- security ----
-            # gitleaks 8.x renamed detect to git, so fall back for older versions
+            # SECURITY - gitleaks 8.x renamed detect to git so fall back if it's an older one
             leaks() {
               if gitleaks git --help >/dev/null 2>&1; then
                 gitleaks git "$ROOT" --no-banner
@@ -147,12 +146,12 @@
 
               # ==================== IAC ====================
               pkgs.terraform  # buildspec.yaml pins its own copy
-              pkgs.tflint     # config in terraform/.tflint.hcl
-              pkgs.checkov    # config in .checkov.yaml
+              pkgs.tflint     # config lives in terraform/.tflint.hcl
+              pkgs.checkov    # config lives in .checkov.yaml
 
               # ================= PYTHON TOOLING ==============
-              # uv is the only python tool from nix, the rest comes from uv.lock.
-              # bump it with required-version in the root pyproject.toml
+              # uv is the only python thing we grab from nix, everything else comes from uv.lock.
+              # bump it with required-version in the root pyproject.toml or uv gets mad
               pkgs.uv         # 0.12.5 right now
 
               # ================ EDITOR SUPPORT ===============
@@ -168,19 +167,19 @@
               pkgs.unzip
             ];
 
-            # use the flake's 3.12 and never let uv download its own
+            # use the flake's 3.12 and never let uv go download its own
             UV_PYTHON = "${python}/bin/python3.12";
             UV_PYTHON_DOWNLOADS = "never";
 
             shellHook = ''
-              # checkov and awscli2 are built on python 3.14 and mkShell stacks their deps
-              # onto PYTHONPATH, which breaks our 3.12 tools (cfn-lint dies on the wrong
-              # build of regex). nothing here needs it so just drop it
+              # checkov and awscli2 are built on python 3.14 and mkShell dumps all their deps onto
+              # PYTHONPATH, which breaks our 3.12 tools. cfn-lint grabs the 3.14 regex and just dies :(
+              # nothing here needs PYTHONPATH anyway so we just drop it
               unset PYTHONPATH
 
-              # always point uv at the repo root. otherwise `uv sync` inside a package strips
-              # .venv down to just that package and you lose ruff and mypy.
-              # to add a dep to one package run `uv add --package craftform-operations <dep>`
+              # always point uv at the repo root. otherwise `uv sync` inside a package strips .venv
+              # down to just that package and you lose ruff and mypy :(
+              # adding a dep to one package is `uv add --package craftform-operations <dep>`
               export UV_PROJECT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 
               echo ""

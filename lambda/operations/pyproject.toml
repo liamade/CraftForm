@@ -1,25 +1,25 @@
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║                               CraftForm                                    ║
+# ║                               CraftForm                                      ║
 # ╠══════════════════════════════════════════════════════════════════════════════╣
-# ║  OPERATIONS LAMBDA  ::  pyproject.toml                                     ║
-# ║  What this lambda needs to run (what ships in the zip).                    ║
-# ║  dev tools are in the root one                                             ║
+# ║  OPERATIONS LAMBDA  ::  pyproject.toml                                       ║
+# ║  What this lambda needs to run (the stuff that ships in the zip).            ║
+# ║  dev tools live in the root one                                              ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
-# pyproject doesn't inherit from the root, so name, version and python live here
+# pyproject doesn't inherit from the root so name, version and python gotta live here
 
 [project]
 name = "craftform-operations"
 version = "0.0.0"               # unused, git tags version the releases
 requires-python = "==3.12.*"    # the lambda runtime
 
-# minimum versions, uv.lock pins them. no boto3 because lambda ships its own
+# minimum versions, uv.lock pins them. no boto3 because lambda already ships it
 dependencies = [
   "pynacl>=1.6.2",    # checks discord's signature on every interaction
-  "urllib3>=2",       # discord http calls
+  "urllib3>=2",       # the discord http calls
 ]
 
-# just a folder that gets zipped, so uv installs the deps and never builds it
+# it's just a folder that gets zipped, so uv installs the deps and never tries to build it
 [tool.uv]
 package = false
 
@@ -27,8 +27,8 @@ package = false
 # ==========================================================================================
 #                                 PYTEST
 # ==========================================================================================
-# here and not in the root so each package gets its own pytest. pythonpath lets tests
-# import things the same way the lambda does, and keeps the two index.py files apart
+# lives here and not in the root so each package gets its own pytest. pythonpath lets tests
+# import stuff the same way the lambda does, and keeps this index.py from fighting with startup's
 [tool.pytest]
 pythonpath = ["."]
 testpaths = ["tests"]
