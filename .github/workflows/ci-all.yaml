@@ -45,7 +45,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Setup uv + Python
-        uses: astral-sh/setup-uv@v10.3.3
+        uses: astral-sh/setup-uv@v10.4.0
         with:
           python-version: "3.12"  # uv version comes from the root pyproject -- see lambda-ci.yaml
 
@@ -135,7 +135,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Setup uv + Python
-        uses: astral-sh/setup-uv@v10.3.3
+        uses: astral-sh/setup-uv@v10.4.0
         with:
           python-version: "3.12"  # uv version comes from the root pyproject -- see lambda-ci.yaml
 

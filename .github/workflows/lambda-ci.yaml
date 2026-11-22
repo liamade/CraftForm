@@ -47,7 +47,7 @@ jobs:
       # no `version:` on purpose -- setup-uv reads required-version from the root pyproject.toml,
       # the ONE place the uv version lives (matches the flake's uv)
       - name: Setup uv + Python
-        uses: astral-sh/setup-uv@v10.3.3
+        uses: astral-sh/setup-uv@v10.4.0
         with:
           python-version: "3.12"  # uv finds or downloads it
 
